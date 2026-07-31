@@ -56,9 +56,10 @@ export async function POST(req) {
         category: data.category,
         quantity: parseInt(data.quantity) || 1,
         purchasePrice: parseFloat(data.purchasePrice),
-        currentPrice: data.currentPrice
-          ? parseFloat(data.currentPrice)
-          : parseFloat(data.purchasePrice),
+        currentPrice:
+          data.currentPrice !== undefined && data.currentPrice !== null
+            ? parseFloat(data.currentPrice)
+            : parseFloat(data.purchasePrice),
         imageUrl: data.imageUrl,
         cardmarketUrl: data.cardmarketUrl,
         purchaseDate: new Date(data.purchaseDate),

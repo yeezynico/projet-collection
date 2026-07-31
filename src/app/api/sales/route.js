@@ -38,32 +38,63 @@ export async function POST(req) {
     const percentage =
       purchasePrice > 0 ? (gain / (purchasePrice * quantity)) * 100 : null;
 
-    const sale = await prisma.sale.create({
-      data: {
-        userId: session.user.id,
-        itemType: data.itemType,
-        itemName: data.itemName,
-        quantity,
-        purchasePrice,
-        salePrice,
-        gain,
-        percentage,
-        imageUrl: data.imageUrl,
-        saleDate: new Date(data.saleDate),
-      },
+    const { sale, remainingQuantity } = await prisma.$transaction(async (tx) => {
+      const created = await tx.sale.create({
+        data: {
+          userId: session.user.id,
+          itemType: data.itemType,
+          itemCategory: data.itemCategory || null,
+          itemName: data.itemName,
+          quantity,
+          purchasePrice,
+          salePrice,
+          gain,
+          percentage,
+          imageUrl: data.imageUrl,
+          saleDate: new Date(data.saleDate),
+        },
+      });
+
+      let remaining = null;
+
+      if (data.cardId) {
+        const card = await tx.card.findFirst({
+          where: { id: data.cardId, userId: session.user.id },
+        });
+        if (card) {
+          if (quantity >= card.quantity) {
+            await tx.card.delete({ where: { id: card.id } });
+            remaining = 0;
+          } else {
+            remaining = card.quantity - quantity;
+            await tx.card.update({
+              where: { id: card.id },
+              data: { quantity: remaining },
+            });
+          }
+        }
+      } else if (data.sealedId) {
+        const sealedItem = await tx.sealedProduct.findFirst({
+          where: { id: data.sealedId, userId: session.user.id },
+        });
+        if (sealedItem) {
+          if (quantity >= sealedItem.quantity) {
+            await tx.sealedProduct.delete({ where: { id: sealedItem.id } });
+            remaining = 0;
+          } else {
+            remaining = sealedItem.quantity - quantity;
+            await tx.sealedProduct.update({
+              where: { id: sealedItem.id },
+              data: { quantity: remaining },
+            });
+          }
+        }
+      }
+
+      return { sale: created, remainingQuantity: remaining };
     });
 
-    if (data.cardId) {
-      await prisma.card.delete({
-        where: { id: data.cardId },
-      });
-    } else if (data.sealedId) {
-      await prisma.sealedProduct.delete({
-        where: { id: data.sealedId },
-      });
-    }
-
-    return NextResponse.json(sale, { status: 201 });
+    return NextResponse.json({ ...sale, remainingQuantity }, { status: 201 });
   } catch (error) {
     console.error("Sales POST error:", error);
     return NextResponse.json({ error: "Error" }, { status: 500 });

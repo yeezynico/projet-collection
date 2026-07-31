@@ -144,6 +144,8 @@ model Sale {
 
   itemType String
 
+  itemCategory String?
+
   itemName String
 
   quantity Int @default(1)

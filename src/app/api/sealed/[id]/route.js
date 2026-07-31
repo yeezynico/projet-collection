@@ -4,13 +4,14 @@ import { NextResponse } from "next/server";
 
 export async function GET(req, { params }) {
   try {
+    const { id } = await params;
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const sealed = await prisma.sealedProduct.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!sealed || sealed.userId !== session.user.id) {
@@ -19,19 +20,21 @@ export async function GET(req, { params }) {
 
     return NextResponse.json(sealed);
   } catch (error) {
+    console.error("Sealed GET error:", error);
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
 
 export async function PUT(req, { params }) {
   try {
+    const { id } = await params;
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const sealed = await prisma.sealedProduct.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!sealed || sealed.userId !== session.user.id) {
@@ -41,7 +44,7 @@ export async function PUT(req, { params }) {
     const data = await req.json();
 
     const updated = await prisma.sealedProduct.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         name: data.name,
         type: data.type,
@@ -60,31 +63,30 @@ export async function PUT(req, { params }) {
 
     return NextResponse.json(updated);
   } catch (error) {
+    console.error("Sealed PUT error:", error);
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }
 
 export async function DELETE(req, { params }) {
   try {
+    const { id } = await params;
     const session = await auth();
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const sealed = await prisma.sealedProduct.findUnique({
-      where: { id: params.id },
+    const { count } = await prisma.sealedProduct.deleteMany({
+      where: { id, userId: session.user.id },
     });
 
-    if (!sealed || sealed.userId !== session.user.id) {
+    if (count === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    await prisma.sealedProduct.delete({
-      where: { id: params.id },
-    });
-
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("Sealed DELETE error:", error);
     return NextResponse.json({ error: "Error" }, { status: 500 });
   }
 }

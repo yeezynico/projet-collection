@@ -9,18 +9,18 @@ export default function DashboardLayout({ children, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-dark-950">
-      {/* Sidebar */}
+    <div className="min-h-screen bg-dark-950">
+      {/* Sidebar — toujours fixe, ne scrolle jamais avec la page */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 transition-transform lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <Sidebar user={user} onClose={() => setSidebarOpen(false)} />
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col">
+      {/* Main content, décalé pour laisser la place à la sidebar fixe */}
+      <div className="lg:ml-64 flex flex-col min-h-screen">
         <Header onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
 
         <main className="flex-1 overflow-auto p-4 lg:p-6">

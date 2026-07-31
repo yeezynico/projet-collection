@@ -4,8 +4,9 @@ export const metadata = {
   title: "Connexion | Pokémon Collection",
 };
 
-export default function LoginPage({ searchParams }) {
-  const registered = searchParams?.registered;
+export default async function LoginPage({ searchParams }) {
+  const params = await searchParams;
+  const registered = params?.registered;
 
   return (
     <main className="min-h-screen flex items-center justify-center px-4">

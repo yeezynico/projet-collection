@@ -1,51 +1,75 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, ImageOff, Tag, SlidersHorizontal } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { getImageSrc } from "@/lib/image";
+import { CARD_CATEGORIES } from "@/lib/categories";
+
+const emptyForm = {
+  name: "",
+  extension: "",
+  category: "",
+  quantity: "1",
+  purchasePrice: "",
+  currentPrice: "",
+  imageUrl: "",
+  cardmarketUrl: "",
+  purchaseDate: new Date().toISOString().split("T")[0],
+};
 
 export default function CardsPage() {
   const { data: session } = useSession();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sort, setSort] = useState("recent");
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    extension: "",
-    category: "",
-    quantity: 1,
-    purchasePrice: 0,
-    currentPrice: 0,
-    imageUrl: "",
-    cardmarketUrl: "",
-    purchaseDate: new Date().toISOString().split("T")[0],
+  const [formData, setFormData] = useState(emptyForm);
+  const [sellingCard, setSellingCard] = useState(null);
+  const [sellData, setSellData] = useState({
+    quantity: "1",
+    salePrice: "",
+    saleDate: new Date().toISOString().split("T")[0],
   });
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
 
+  function toggleCategory(cat) {
+    setSelectedCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  }
+
+  // Debounce la recherche pour éviter une requête réseau à chaque frappe
   useEffect(() => {
-    fetchCards();
-  }, [search, sort]);
+    const timeout = setTimeout(() => setDebouncedSearch(search), 350);
+    return () => clearTimeout(timeout);
+  }, [search]);
 
-  async function fetchCards() {
+  const fetchCards = useCallback(async () => {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (search) params.append("search", search);
+      if (debouncedSearch) params.append("search", debouncedSearch);
       if (sort) params.append("sort", sort);
 
       const res = await fetch(`/api/cards?${params}`);
       if (res.ok) {
-        const data = await res.json();
-        setCards(data);
+        setCards(await res.json());
       }
     } catch (error) {
       console.error("Error fetching cards:", error);
     } finally {
       setLoading(false);
     }
-  }
+  }, [debouncedSearch, sort]);
+
+  useEffect(() => {
+    fetchCards();
+  }, [fetchCards]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -53,23 +77,21 @@ export default function CardsPage() {
       const res = await fetch("/api/cards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          quantity: parseInt(formData.quantity) || 1,
+          purchasePrice: parseFloat(formData.purchasePrice) || 0,
+          currentPrice: formData.currentPrice
+            ? parseFloat(formData.currentPrice)
+            : undefined,
+        }),
       });
 
       if (res.ok) {
-        setFormData({
-          name: "",
-          extension: "",
-          category: "",
-          quantity: 1,
-          purchasePrice: 0,
-          currentPrice: 0,
-          imageUrl: "",
-          cardmarketUrl: "",
-          purchaseDate: new Date().toISOString().split("T")[0],
-        });
+        const newCard = await res.json();
+        setCards((prev) => [newCard, ...prev]);
+        setFormData(emptyForm);
         setShowForm(false);
-        fetchCards();
       }
     } catch (error) {
       console.error("Error adding card:", error);
@@ -79,22 +101,79 @@ export default function CardsPage() {
   async function deleteCard(id) {
     if (!confirm("Êtes-vous sûr ?")) return;
 
+    const previous = cards;
+    setCards((prev) => prev.filter((c) => c.id !== id));
+
     try {
       const res = await fetch(`/api/cards/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        fetchCards();
-      }
+      if (!res.ok) setCards(previous);
     } catch (error) {
       console.error("Error deleting card:", error);
+      setCards(previous);
     }
   }
 
-  const totalInvested = cards.reduce(
+  function openSellModal(card) {
+    setSellingCard(card);
+    setSellData({
+      quantity: "1",
+      salePrice: (card.currentPrice ?? card.purchasePrice).toString(),
+      saleDate: new Date().toISOString().split("T")[0],
+    });
+  }
+
+  async function handleSell(e) {
+    e.preventDefault();
+    if (!sellingCard) return;
+
+    const maxQty = sellingCard.quantity;
+    const sellQty = Math.min(Math.max(parseInt(sellData.quantity) || 1, 1), maxQty);
+    const remaining = maxQty - sellQty;
+
+    const previous = cards;
+    setCards((prev) =>
+      remaining > 0
+        ? prev.map((c) => (c.id === sellingCard.id ? { ...c, quantity: remaining } : c))
+        : prev.filter((c) => c.id !== sellingCard.id)
+    );
+    setSellingCard(null);
+
+    try {
+      const res = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          itemType: "card",
+          itemCategory: sellingCard.category,
+          itemName: sellingCard.name,
+          quantity: sellQty,
+          purchasePrice: sellingCard.purchasePrice,
+          salePrice: parseFloat(sellData.salePrice) || 0,
+          saleDate: sellData.saleDate,
+          imageUrl: sellingCard.imageUrl,
+          cardId: sellingCard.id,
+        }),
+      });
+
+      if (!res.ok) setCards(previous);
+    } catch (error) {
+      console.error("Error selling card:", error);
+      setCards(previous);
+    }
+  }
+
+  const filteredCards =
+    selectedCategories.length === 0
+      ? cards
+      : cards.filter((card) => selectedCategories.includes(card.category));
+
+  const totalInvested = filteredCards.reduce(
     (sum, card) => sum + card.purchasePrice * card.quantity,
     0
   );
-  const totalValue = cards.reduce(
-    (sum, card) => sum + (card.currentPrice || card.purchasePrice) * card.quantity,
+  const totalValue = filteredCards.reduce(
+    (sum, card) =>
+      sum + (card.currentPrice ?? card.purchasePrice) * card.quantity,
     0
   );
   const potentialGain = totalValue - totalInvested;
@@ -107,12 +186,13 @@ export default function CardsPage() {
           <div>
             <h1 className="text-3xl font-bold text-dark-50">Cartes Pokémon</h1>
             <p className="text-dark-400 mt-1">
-              {cards.length} carte{cards.length > 1 ? "s" : ""} dans votre collection
+              {filteredCards.length} carte{filteredCards.length > 1 ? "s" : ""}
+              {filteredCards.length !== cards.length && ` sur ${cards.length}`} dans votre collection
             </p>
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
           >
             <Plus size={20} />
             Ajouter une carte
@@ -172,17 +252,11 @@ export default function CardsPage() {
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                 >
                   <option value="">Choisir...</option>
-                  <option value="Promo">Promo</option>
-                  <option value="Rare">Illustration Rare</option>
-                  <option value="Alt Art">Illustration Rare Spéciale / Alt Art</option>
-                  <option value="Gold">Gold</option>
-                  <option value="EX">EX</option>
-                  <option value="GX">GX</option>
-                  <option value="V">V</option>
-                  <option value="VMAX">VMAX</option>
-                  <option value="VSTAR">VSTAR</option>
-                  <option value="Full Art">Full Art</option>
-                  <option value="Rainbow">Rainbow</option>
+                  {CARD_CATEGORIES.map((cat) => (
+                    <option key={cat.value} value={cat.value}>
+                      {cat.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -195,10 +269,7 @@ export default function CardsPage() {
                   min="1"
                   value={formData.quantity}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      quantity: parseInt(e.target.value),
-                    })
+                    setFormData({ ...formData, quantity: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                 />
@@ -214,10 +285,7 @@ export default function CardsPage() {
                   required
                   value={formData.purchasePrice}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      purchasePrice: parseFloat(e.target.value),
-                    })
+                    setFormData({ ...formData, purchasePrice: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                 />
@@ -232,11 +300,9 @@ export default function CardsPage() {
                   step="0.01"
                   value={formData.currentPrice}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      currentPrice: parseFloat(e.target.value),
-                    })
+                    setFormData({ ...formData, currentPrice: e.target.value })
                   }
+                  placeholder="= prix d'achat si vide"
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                 />
               </div>
@@ -264,10 +330,7 @@ export default function CardsPage() {
                   type="date"
                   value={formData.purchaseDate}
                   onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      purchaseDate: e.target.value,
-                    })
+                    setFormData({ ...formData, purchaseDate: e.target.value })
                   }
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                 />
@@ -318,10 +381,52 @@ export default function CardsPage() {
             <option value="price-asc">Prix croissant</option>
             <option value="price-desc">Prix décroissant</option>
           </select>
+
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
+              selectedCategories.length > 0
+                ? "bg-brand-primary/20 border-brand-primary text-brand-primary"
+                : "bg-dark-800 border-dark-700 text-dark-300 hover:border-dark-600"
+            }`}
+          >
+            <SlidersHorizontal size={18} />
+            Catégories
+            {selectedCategories.length > 0 && ` (${selectedCategories.length})`}
+          </button>
         </div>
 
+        {showFilters && (
+          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4">
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {CARD_CATEGORIES.map((cat) => (
+                <label
+                  key={cat.value}
+                  className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat.value)}
+                    onChange={() => toggleCategory(cat.value)}
+                    className="w-4 h-4 accent-brand-primary cursor-pointer"
+                  />
+                  {cat.label}
+                </label>
+              ))}
+            </div>
+            {selectedCategories.length > 0 && (
+              <button
+                onClick={() => setSelectedCategories([])}
+                className="text-sm text-dark-400 hover:text-dark-200 transition mt-3"
+              >
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Stats */}
-        {cards.length > 0 && (
+        {filteredCards.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
               <p className="text-dark-400 text-sm">Montant investi</p>
@@ -353,89 +458,221 @@ export default function CardsPage() {
           <div className="text-center py-12">
             <p className="text-dark-400">Chargement...</p>
           </div>
-        ) : cards.length === 0 ? (
+        ) : filteredCards.length === 0 ? (
           <div className="text-center py-12 bg-dark-800/50 rounded-xl">
-            <p className="text-dark-400 mb-4">Aucune carte pour le moment</p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition"
-            >
-              Ajouter votre première carte
-            </button>
+            <p className="text-dark-400 mb-4">
+              {cards.length === 0 ? "Aucune carte pour le moment" : "Aucune carte ne correspond aux filtres"}
+            </p>
+            {cards.length === 0 && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition"
+              >
+                Ajouter votre première carte
+              </button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {cards.map((card) => {
-              const gain = (card.currentPrice || card.purchasePrice) * card.quantity - card.purchasePrice * card.quantity;
-              const gainPercent = card.purchasePrice > 0 ? (gain / (card.purchasePrice * card.quantity)) * 100 : 0;
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-2">
+            {filteredCards.map((card) => {
+              const currentPrice = card.currentPrice ?? card.purchasePrice;
+              const gain =
+                currentPrice * card.quantity - card.purchasePrice * card.quantity;
+              const gainPercent =
+                card.purchasePrice > 0
+                  ? (gain / (card.purchasePrice * card.quantity)) * 100
+                  : null;
 
               return (
                 <div
                   key={card.id}
-                  className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl overflow-hidden hover:border-dark-600 transition group"
+                  className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group"
                 >
-                  {card.imageUrl && (
-                    <div className="aspect-square bg-dark-900 overflow-hidden">
+                  <div className="relative aspect-[3/4] bg-dark-900 overflow-hidden flex items-center justify-center">
+                    {card.quantity > 1 && (
+                      <span className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] font-semibold text-dark-50">
+                        ×{card.quantity}
+                      </span>
+                    )}
+                    {card.imageUrl ? (
                       <img
-                        src={card.imageUrl}
+                        src={getImageSrc(card.imageUrl)}
                         alt={card.name}
                         className="w-full h-full object-cover group-hover:scale-105 transition"
+                        onError={(e) => {
+                          e.target.style.display = "none";
+                          e.target.nextSibling.style.display = "flex";
+                        }}
                       />
+                    ) : null}
+                    <div
+                      className="w-full h-full items-center justify-center text-dark-600"
+                      style={{ display: card.imageUrl ? "none" : "flex" }}
+                    >
+                      <ImageOff size={22} />
                     </div>
-                  )}
+                  </div>
 
-                  <div className="p-4 space-y-3">
-                    <h3 className="font-semibold text-dark-50 line-clamp-2">
-                      {card.name}
-                    </h3>
+                  <div className="p-1.5 space-y-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h3 className="font-semibold text-dark-50 text-xs line-clamp-1" title={card.name}>
+                        {card.name}
+                      </h3>
+                      <span className="shrink-0 text-[10px] font-semibold text-dark-400">
+                        ×{card.quantity}
+                      </span>
+                    </div>
 
-                    {card.extension && (
-                      <p className="text-xs text-brand-primary">
-                        {card.extension}
-                      </p>
-                    )}
-
-                    <div className="space-y-2 text-sm">
-                      {card.quantity > 1 && (
-                        <div className="flex justify-between">
-                          <span className="text-dark-400">Quantité:</span>
-                          <span className="text-dark-50">{card.quantity}</span>
-                        </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {card.extension && (
+                        <span className="text-[10px] text-brand-primary line-clamp-1">
+                          {card.extension}
+                        </span>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-dark-400">Achat:</span>
-                        <span className="text-dark-50">€{card.purchasePrice.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-dark-400">Actuel:</span>
-                        <span className="text-dark-50">
-                          €{(card.currentPrice || card.purchasePrice).toFixed(2)}
+                      {card.category && (
+                        <span className="text-[9px] px-1 py-0.5 bg-brand-primary/10 text-brand-primary rounded font-medium line-clamp-1">
+                          {card.category}
                         </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-x-1 text-[10px]">
+                      <div>
+                        <p className="text-dark-500">Achat</p>
+                        <p className="text-dark-200 font-medium">€{card.purchasePrice.toFixed(2)}</p>
                       </div>
-                      <div
-                        className={`flex justify-between font-semibold ${
-                          gain >= 0 ? "text-green-400" : "text-red-400"
-                        }`}
-                      >
-                        <span>Gain:</span>
-                        <span>
-                          €{gain.toFixed(2)} ({gainPercent.toFixed(1)}%)
-                        </span>
+                      <div>
+                        <p className="text-dark-500">Actuel</p>
+                        <p className="text-dark-200 font-medium">€{currentPrice.toFixed(2)}</p>
                       </div>
                     </div>
 
-                    <div className="flex gap-2 pt-3 border-t border-dark-700">
+                    <div
+                      className={`text-[10px] font-semibold ${
+                        gain >= 0 ? "text-green-400" : "text-red-400"
+                      }`}
+                    >
+                      {gain >= 0 ? "+" : ""}€{gain.toFixed(2)}
+                      {gainPercent !== null && ` (${gainPercent >= 0 ? "+" : ""}${gainPercent.toFixed(0)}%)`}
+                    </div>
+
+                    <div className="flex gap-1 pt-1 border-t border-dark-700">
+                      <button
+                        onClick={() => openSellModal(card)}
+                        title="Vendre"
+                        className="flex-1 py-1 bg-green-500/10 text-green-400 rounded text-[10px] font-medium hover:bg-green-500/20 transition"
+                      >
+                        Vendre
+                      </button>
                       <button
                         onClick={() => deleteCard(card.id)}
-                        className="flex-1 px-3 py-2 bg-red-500/10 text-red-400 rounded text-sm font-medium hover:bg-red-500/20 transition"
+                        title="Supprimer"
+                        className="px-1.5 py-1 bg-red-500/10 text-red-400 rounded text-[10px] font-medium hover:bg-red-500/20 transition"
                       >
-                        Supprimer
+                        ✕
                       </button>
                     </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Sell Modal */}
+        {sellingCard && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                  {sellingCard.imageUrl ? (
+                    <img
+                      src={getImageSrc(sellingCard.imageUrl)}
+                      alt={sellingCard.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff size={24} className="text-dark-600" />
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                    <Tag size={12} /> Vente
+                  </p>
+                  <h2 className="text-lg font-semibold text-dark-50">
+                    {sellingCard.name}
+                  </h2>
+                </div>
+              </div>
+
+              <form onSubmit={handleSell} className="space-y-4">
+                {sellingCard.quantity > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Quantité à vendre * (max {sellingCard.quantity})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={sellingCard.quantity}
+                      required
+                      value={sellData.quantity}
+                      onChange={(e) =>
+                        setSellData({ ...sellData, quantity: e.target.value })
+                      }
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Prix de vente (€) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    autoFocus
+                    value={sellData.salePrice}
+                    onChange={(e) =>
+                      setSellData({ ...sellData, salePrice: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Date de vente
+                  </label>
+                  <input
+                    type="date"
+                    value={sellData.saleDate}
+                    onChange={(e) =>
+                      setSellData({ ...sellData, saleDate: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition"
+                  >
+                    Confirmer la vente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSellingCard(null)}
+                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
       </div>

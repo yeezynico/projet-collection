@@ -1,34 +1,33 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import DashboardLayout from "@/components/dashboard/Layout";
-import StatCard from "@/components/dashboard/StatCard";
-import {
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  Package,
-  Cpu,
-  Target,
-} from "lucide-react";
+import { getStats } from "@/lib/stats";
+import { Cpu, Package, TrendingUp, ArrowRight } from "lucide-react";
 
 export const metadata = {
   title: "Dashboard | Pokémon Collection",
 };
 
-async function getStats(userId) {
-  try {
-    const baseUrl =
-      process.env.NEXTAUTH_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/stats`, {
-      headers: {
-        cookie: `next-auth.session-token=${process.env.AUTH_TOKEN}`,
-      },
-    });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
+export const dynamic = "force-dynamic";
+
+function fmt(n) {
+  return `€${(n ?? 0).toFixed(2)}`;
+}
+
+function GainBadge({ gain, percentage, size = "md" }) {
+  const positive = gain >= 0;
+  const color = gain === 0 ? "text-dark-400" : positive ? "text-green-400" : "text-red-400";
+  const textSize = size === "lg" ? "text-lg" : "text-sm";
+
+  return (
+    <span className={`font-semibold ${color} ${textSize}`}>
+      {positive ? "+" : ""}{fmt(gain)}
+      {percentage !== null && percentage !== undefined && (
+        <span className="opacity-80"> ({positive ? "+" : ""}{percentage.toFixed(1)}%)</span>
+      )}
+    </span>
+  );
 }
 
 export default async function DashboardPage() {
@@ -42,143 +41,114 @@ export default async function DashboardPage() {
 
   return (
     <DashboardLayout user={session.user}>
-      <div className="space-y-8">
-        {/* Title */}
+      <div className="space-y-6 max-w-5xl">
         <div>
-          <h1 className="text-3xl font-bold text-dark-50 mb-2">
-            Bienvenue, {session.user.name || "Collectionneur"}
+          <h1 className="text-2xl font-bold text-dark-50">
+            Bonjour, {session.user.name || "Collectionneur"}
           </h1>
-          <p className="text-dark-400">
-            Aperçu complet de votre collection Pokémon
+          <p className="text-dark-400 text-sm mt-1">
+            Aperçu de votre collection Pokémon
           </p>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <StatCard
-            label="Total de cartes"
-            value={stats?.totalCards || 0}
-            icon={Cpu}
-            variant="primary"
-          />
-          <StatCard
-            label="Produits scellés"
-            value={stats?.totalSealed || 0}
-            icon={Package}
-          />
-          <StatCard
-            label="Total d'articles"
-            value={stats?.totalItems || 0}
-            icon={Target}
-          />
-
-          <StatCard
-            label="Montant investi"
-            value={`€${(stats?.totalInvested || 0).toFixed(2)}`}
-            icon={Wallet}
-          />
-          <StatCard
-            label="Valeur actuelle"
-            value={`€${(stats?.currentValue || 0).toFixed(2)}`}
-            icon={TrendingUp}
-          />
-        </div>
-
-        {/* Gains Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-dark-50 mb-4">
-              Gain potentiel
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-dark-400 text-sm mb-1">Montant</p>
-                <p
-                  className={`text-3xl font-bold ${
-                    (stats?.potentialGain || 0) >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  €{(stats?.potentialGain || 0).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-dark-400 text-sm mb-1">Pourcentage</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    (stats?.potentialPercentage || 0) >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {(stats?.potentialPercentage || 0).toFixed(1)}%
-                </p>
-              </div>
+        {/* Hero: valeur totale */}
+        <div className="bg-linear-to-br from-brand-primary/10 via-dark-800/50 to-brand-secondary/10 border border-dark-700 rounded-2xl p-8">
+          <p className="text-dark-400 text-sm mb-2">Valeur totale de la collection</p>
+          <div className="flex items-end gap-4 flex-wrap">
+            <p className="text-4xl md:text-5xl font-bold text-dark-50">
+              {fmt(stats.currentValue)}
+            </p>
+            <div className="pb-1.5">
+              <GainBadge gain={stats.potentialGain} percentage={stats.potentialPercentage} size="lg" />
             </div>
           </div>
-
-          <div className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-6">
-            <h2 className="text-lg font-semibold text-dark-50 mb-4">
-              Gain réalisé
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-dark-400 text-sm mb-1">Montant</p>
-                <p
-                  className={`text-3xl font-bold ${
-                    (stats?.totalRealized || 0) >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  €{(stats?.totalRealized || 0).toFixed(2)}
-                </p>
-              </div>
-              <div>
-                <p className="text-dark-400 text-sm mb-1">Pourcentage</p>
-                <p
-                  className={`text-2xl font-bold ${
-                    (stats?.realizedPercentage || 0) >= 0
-                      ? "text-green-400"
-                      : "text-red-400"
-                  }`}
-                >
-                  {(stats?.realizedPercentage || 0).toFixed(1)}%
-                </p>
-              </div>
-            </div>
-          </div>
+          <p className="text-dark-500 text-sm mt-3">
+            {fmt(stats.totalInvested)} investis · {stats.totalItems} article{stats.totalItems > 1 ? "s" : ""}
+          </p>
         </div>
 
-        {/* Quick Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <a
+        {/* Répartition Cartes / Scellés */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link
             href="/cards"
-            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-6 hover:border-brand-primary/50 transition group"
+            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-brand-primary/50 transition group"
           >
-            <Cpu size={32} className="text-brand-primary mb-3 group-hover:scale-110 transition" />
-            <h3 className="text-lg font-semibold text-dark-50 mb-2">
-              Gérer les cartes
-            </h3>
-            <p className="text-dark-400 text-sm">
-              Ajouter, modifier ou vendre vos cartes Pokémon
-            </p>
-          </a>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-brand-primary/10 rounded-lg">
+                  <Cpu size={18} className="text-brand-primary" />
+                </div>
+                <span className="font-semibold text-dark-50">Cartes</span>
+                <span className="text-dark-500 text-sm">· {stats.totalCards}</span>
+              </div>
+              <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 group-hover:text-brand-primary transition" />
+            </div>
 
-          <a
+            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+              <div>
+                <p className="text-dark-500 text-xs">Investi</p>
+                <p className="text-dark-200 font-medium">{fmt(stats.cards.invested)}</p>
+              </div>
+              <div>
+                <p className="text-dark-500 text-xs">Valeur actuelle</p>
+                <p className="text-dark-200 font-medium">{fmt(stats.cards.value)}</p>
+              </div>
+            </div>
+
+            <GainBadge gain={stats.cards.gain} percentage={stats.cards.gainPercentage} />
+          </Link>
+
+          <Link
             href="/sealed"
-            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-6 hover:border-brand-primary/50 transition group"
+            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-brand-secondary/50 transition group"
           >
-            <Package size={32} className="text-brand-secondary mb-3 group-hover:scale-110 transition" />
-            <h3 className="text-lg font-semibold text-dark-50 mb-2">
-              Produits scellés
-            </h3>
-            <p className="text-dark-400 text-sm">
-              Gérer vos boîtes, displays et coffrets
-            </p>
-          </a>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-brand-secondary/10 rounded-lg">
+                  <Package size={18} className="text-brand-secondary" />
+                </div>
+                <span className="font-semibold text-dark-50">Scellés</span>
+                <span className="text-dark-500 text-sm">· {stats.totalSealed}</span>
+              </div>
+              <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 group-hover:text-brand-secondary transition" />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+              <div>
+                <p className="text-dark-500 text-xs">Investi</p>
+                <p className="text-dark-200 font-medium">{fmt(stats.sealed.invested)}</p>
+              </div>
+              <div>
+                <p className="text-dark-500 text-xs">Valeur actuelle</p>
+                <p className="text-dark-200 font-medium">{fmt(stats.sealed.value)}</p>
+              </div>
+            </div>
+
+            <GainBadge gain={stats.sealed.gain} percentage={stats.sealed.gainPercentage} />
+          </Link>
         </div>
+
+        {/* Gain réalisé */}
+        <Link
+          href="/sales"
+          className="flex items-center justify-between bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-dark-600 transition group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-500/10 rounded-lg">
+              <TrendingUp size={18} className="text-green-400" />
+            </div>
+            <div>
+              <p className="font-semibold text-dark-50">Gain réalisé</p>
+              <p className="text-dark-500 text-xs">
+                {stats.totalSales} vente{stats.totalSales > 1 ? "s" : ""} au total
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <GainBadge gain={stats.totalRealized} percentage={stats.realizedPercentage} size="lg" />
+            <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 transition" />
+          </div>
+        </Link>
       </div>
     </DashboardLayout>
   );

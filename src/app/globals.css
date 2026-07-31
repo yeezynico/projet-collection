@@ -6,6 +6,8 @@
 
 html {
   scroll-behavior: smooth;
+  color-scheme: dark;
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -19,13 +21,18 @@ body {
 input,
 textarea,
 select {
-  background: rgba(255, 255, 255, 0.05);
+  background-color: #1a1f2e;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e9ecef;
   border-radius: 0.5rem;
   padding: 0.75rem;
   font-size: 1rem;
   transition: all 0.2s ease;
+}
+
+select option {
+  background-color: #1a1f2e;
+  color: #e9ecef;
 }
 
 input:focus,
