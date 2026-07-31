@@ -2,66 +2,136 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function RegisterForm() {
   const router = useRouter();
-
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setError("");
 
-    const response = await fetch("/api/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        name,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setError(data.error);
+    if (password !== confirmPassword) {
+      setError("Les mots de passe ne correspondent pas");
       return;
     }
 
-    router.push("/login");
+    if (password.length < 6) {
+      setError("Le mot de passe doit contenir au moins 6 caractères");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, name }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erreur lors de l'inscription");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/login?registered=true");
+    } catch (err) {
+      setError("Erreur lors de l'inscription");
+      setLoading(false);
+    }
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <input
-        placeholder="Nom"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
+    <form onSubmit={handleSubmit} className="space-y-4 w-full">
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">
+          Nom (optionnel)
+        </label>
+        <input
+          type="text"
+          placeholder="Votre nom"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={loading}
+          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+        />
+      </div>
 
-      <input
-        placeholder="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">
+          Email
+        </label>
+        <input
+          type="email"
+          placeholder="votre@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={loading}
+          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+        />
+      </div>
 
-      <input
-        placeholder="Mot de passe"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">
+          Mot de passe
+        </label>
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={loading}
+          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+        />
+      </div>
 
-      {error && <p>{error}</p>}
+      <div>
+        <label className="block text-sm font-medium text-dark-200 mb-2">
+          Confirmer le mot de passe
+        </label>
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          disabled={loading}
+          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+        />
+      </div>
 
-      <button>Créer mon compte</button>
+      {error && (
+        <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+          {error}
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-secondary text-white font-semibold rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? "Inscription..." : "S'inscrire"}
+      </button>
+
+      <p className="text-center text-dark-400">
+        Déjà un compte ?{" "}
+        <Link href="/login" className="text-brand-primary hover:text-brand-secondary font-semibold">
+          Se connecter
+        </Link>
+      </p>
     </form>
   );
 }

@@ -1,13 +1,12 @@
-export default function Home() {
-  return (
-    <main>
-      <h1>
-        Pokémon Collection
-      </h1>
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
-      <p>
-        Application de gestion de collection Pokémon
-      </p>
-    </main>
-  );
+export default async function Home() {
+  const session = await auth();
+
+  if (session) {
+    redirect("/dashboard");
+  }
+
+  redirect("/login");
 }
