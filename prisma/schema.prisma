@@ -90,13 +90,23 @@ model Card {
 
   extension String?
 
+  number String?
+
   category String?
+
+  language String?
+
+  condition String?
 
   quantity Int @default(1)
 
   purchasePrice Float
 
   currentPrice Float?
+
+  priceSource String?
+
+  priceUpdatedAt DateTime?
 
   imageUrl String?
 
@@ -117,11 +127,19 @@ model SealedProduct {
 
   type String
 
+  language String?
+
+  condition String?
+
   quantity Int @default(1)
 
   purchasePrice Float
 
   currentPrice Float?
+
+  priceSource String?
+
+  priceUpdatedAt DateTime?
 
   imageUrl String?
 

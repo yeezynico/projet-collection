@@ -2,17 +2,38 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
-import { Plus, Search, ImageOff, Tag, SlidersHorizontal } from "lucide-react";
+import {
+  Plus,
+  Search,
+  ImageOff,
+  Tag,
+  SlidersHorizontal,
+  Pencil,
+  Link2,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
-import { SEALED_TYPES } from "@/lib/categories";
+import {
+  SEALED_TYPES,
+  LANGUAGES,
+  CONDITIONS,
+  CONDITION_STYLES,
+  getLanguage,
+} from "@/lib/categories";
+import { buildFilteredUrl } from "@/lib/cardmarket";
 
 const emptyForm = {
   name: "",
   type: "",
+  language: "FR",
+  condition: "",
   quantity: "1",
   purchasePrice: "",
   currentPrice: "",
+  priceSource: "",
+  priceUpdatedAt: "",
   imageUrl: "",
   cardmarketUrl: "",
   purchaseDate: new Date().toISOString().split("T")[0],
@@ -29,16 +50,72 @@ export default function SealedPage() {
   const [formData, setFormData] = useState(emptyForm);
   const [sellingItem, setSellingItem] = useState(null);
   const [sellData, setSellData] = useState({
+    quantity: "1",
     salePrice: "",
     saleDate: new Date().toISOString().split("T")[0],
   });
   const [selectedTypes, setSelectedTypes] = useState([]);
+  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedConditions, setSelectedConditions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editData, setEditData] = useState(emptyForm);
+  const [lookupUrl, setLookupUrl] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [lookupInfo, setLookupInfo] = useState("");
 
-  function toggleTypeFilter(type) {
-    setSelectedTypes((prev) =>
-      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
-    );
+  function toggleIn(setter) {
+    return (value) =>
+      setter((prev) =>
+        prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+      );
+  }
+
+  const toggleTypeFilter = toggleIn(setSelectedTypes);
+  const toggleLanguage = toggleIn(setSelectedLanguages);
+  const toggleCondition = toggleIn(setSelectedConditions);
+
+  const activeFilterCount =
+    selectedTypes.length + selectedLanguages.length + selectedConditions.length;
+
+  /** Pré-remplit le formulaire depuis un lien Cardmarket. */
+  async function handleLookup() {
+    if (!lookupUrl.trim()) return;
+
+    setLookupLoading(true);
+    setLookupError("");
+    setLookupInfo("");
+
+    try {
+      const res = await fetch(`/api/lookup?url=${encodeURIComponent(lookupUrl.trim())}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLookupError(data.error || "Récupération impossible");
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        imageUrl: data.imageUrl || prev.imageUrl,
+        cardmarketUrl: data.cardmarketUrl || lookupUrl.trim(),
+        currentPrice:
+          data.suggestedPrice != null ? data.suggestedPrice.toFixed(2) : prev.currentPrice,
+        priceSource: data.priceSource || "",
+        priceUpdatedAt: data.priceUpdatedAt || "",
+      }));
+
+      setLookupInfo(
+        data.message ||
+          `${data.name || "Produit"} récupéré. Complétez le type et les prix.`
+      );
+    } catch {
+      setLookupError("Erreur réseau lors de la récupération");
+    } finally {
+      setLookupLoading(false);
+    }
   }
 
   useEffect(() => {
@@ -84,6 +161,9 @@ export default function SealedPage() {
         const newItem = await res.json();
         setSealed((prev) => [newItem, ...prev]);
         setFormData(emptyForm);
+        setLookupUrl("");
+        setLookupInfo("");
+        setLookupError("");
         setShowForm(false);
       }
     } catch (error) {
@@ -106,9 +186,61 @@ export default function SealedPage() {
     }
   }
 
+  function openEditModal(item) {
+    setEditingItem(item);
+    setEditData({
+      name: item.name ?? "",
+      type: item.type ?? "",
+      language: item.language ?? "",
+      condition: item.condition ?? "",
+      quantity: item.quantity.toString(),
+      purchasePrice: item.purchasePrice.toString(),
+      currentPrice: (item.currentPrice ?? item.purchasePrice).toString(),
+      priceSource: item.priceSource ?? "",
+      priceUpdatedAt: item.priceUpdatedAt ?? "",
+      imageUrl: item.imageUrl ?? "",
+      cardmarketUrl: item.cardmarketUrl ?? "",
+      purchaseDate: new Date(item.purchaseDate).toISOString().split("T")[0],
+    });
+  }
+
+  async function handleEditSubmit(e) {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    const payload = {
+      ...editData,
+      quantity: parseInt(editData.quantity) || 1,
+      purchasePrice: parseFloat(editData.purchasePrice) || 0,
+      currentPrice:
+        editData.currentPrice === ""
+          ? parseFloat(editData.purchasePrice) || 0
+          : parseFloat(editData.currentPrice),
+    };
+
+    const previous = sealed;
+    setSealed((prev) =>
+      prev.map((s) => (s.id === editingItem.id ? { ...s, ...payload } : s))
+    );
+    setEditingItem(null);
+
+    try {
+      const res = await fetch(`/api/sealed/${editingItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) setSealed(previous);
+    } catch (error) {
+      console.error("Error updating sealed item:", error);
+      setSealed(previous);
+    }
+  }
+
   function openSellModal(item) {
     setSellingItem(item);
     setSellData({
+      quantity: "1",
       salePrice: (item.currentPrice ?? item.purchasePrice).toString(),
       saleDate: new Date().toISOString().split("T")[0],
     });
@@ -118,8 +250,16 @@ export default function SealedPage() {
     e.preventDefault();
     if (!sellingItem) return;
 
+    const maxQty = sellingItem.quantity;
+    const sellQty = Math.min(Math.max(parseInt(sellData.quantity) || 1, 1), maxQty);
+    const remaining = maxQty - sellQty;
+
     const previous = sealed;
-    setSealed((prev) => prev.filter((s) => s.id !== sellingItem.id));
+    setSealed((prev) =>
+      remaining > 0
+        ? prev.map((s) => (s.id === sellingItem.id ? { ...s, quantity: remaining } : s))
+        : prev.filter((s) => s.id !== sellingItem.id)
+    );
     setSellingItem(null);
 
     try {
@@ -130,7 +270,7 @@ export default function SealedPage() {
           itemType: "sealed",
           itemCategory: sellingItem.type,
           itemName: sellingItem.name,
-          quantity: sellingItem.quantity,
+          quantity: sellQty,
           purchasePrice: sellingItem.purchasePrice,
           salePrice: parseFloat(sellData.salePrice) || 0,
           saleDate: sellData.saleDate,
@@ -146,10 +286,14 @@ export default function SealedPage() {
     }
   }
 
-  const filteredSealed =
-    selectedTypes.length === 0
-      ? sealed
-      : sealed.filter((item) => selectedTypes.includes(item.type));
+  const filteredSealed = sealed.filter((item) => {
+    if (selectedTypes.length > 0 && !selectedTypes.includes(item.type)) return false;
+    if (selectedLanguages.length > 0 && !selectedLanguages.includes(item.language))
+      return false;
+    if (selectedConditions.length > 0 && !selectedConditions.includes(item.condition))
+      return false;
+    return true;
+  });
 
   const totalInvested = filteredSealed.reduce((sum, s) => sum + s.purchasePrice * s.quantity, 0);
   const totalValue = filteredSealed.reduce(
@@ -179,6 +323,52 @@ export default function SealedPage() {
         {showForm && (
           <form onSubmit={handleSubmit} className="bg-dark-800/50 border border-dark-700 rounded-xl p-6 space-y-4">
             <h2 className="text-xl font-semibold text-dark-50 mb-4">Ajouter un produit</h2>
+
+            {/* Remplissage automatique depuis un lien Cardmarket */}
+            <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                <Link2 size={16} className="text-brand-primary" />
+                Remplissage automatique depuis Cardmarket
+              </label>
+
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="url"
+                  value={lookupUrl}
+                  onChange={(e) => setLookupUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleLookup();
+                    }
+                  }}
+                  placeholder="https://www.cardmarket.com/fr/Pokemon/Products/..."
+                  className="flex-1 min-w-64 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleLookup}
+                  disabled={lookupLoading || !lookupUrl.trim()}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold text-sm hover:bg-brand-primary/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {lookupLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recherche...
+                    </>
+                  ) : (
+                    "Récupérer"
+                  )}
+                </button>
+              </div>
+
+              {lookupError && <p className="text-sm text-red-400">{lookupError}</p>}
+              {lookupInfo && <p className="text-sm text-green-400">{lookupInfo}</p>}
+              <p className="text-xs text-dark-500">
+                Les produits scellés ne sont pas référencés par la base de cartes : seuls le
+                nom et le lien sont déduits, à compléter manuellement.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-dark-200 mb-2">Nom *</label>
@@ -209,6 +399,38 @@ export default function SealedPage() {
               </div>
 
               <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">Langue</label>
+                <select
+                  value={formData.language}
+                  onChange={(e) => setFormData({ ...formData, language: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                >
+                  <option value="">Non précisée</option>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.flag} {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">État</label>
+                <select
+                  value={formData.condition}
+                  onChange={(e) => setFormData({ ...formData, condition: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                >
+                  <option value="">Non précisé</option>
+                  {CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-dark-200 mb-2">Quantité</label>
                 <input
                   type="number"
@@ -233,14 +455,33 @@ export default function SealedPage() {
 
               <div>
                 <label className="block text-sm font-medium text-dark-200 mb-2">Prix actuel (€)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.currentPrice}
-                  onChange={(e) => setFormData({ ...formData, currentPrice: e.target.value })}
-                  placeholder="= prix d'achat si vide"
-                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.currentPrice}
+                    onChange={(e) => setFormData({ ...formData, currentPrice: e.target.value })}
+                    placeholder="= prix d'achat si vide"
+                    className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                  />
+                  {formData.cardmarketUrl && (
+                    <a
+                      href={buildFilteredUrl(formData.cardmarketUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
+                      className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                </div>
+                {formData.priceSource && (
+                  <p className="text-[11px] text-dark-500 mt-1">
+                    {formData.priceSource}
+                    {formData.priceUpdatedAt && ` · maj ${formData.priceUpdatedAt}`}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -261,6 +502,17 @@ export default function SealedPage() {
                   onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                   placeholder="https://..."
+                />
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-dark-200 mb-2">Lien Cardmarket</label>
+                <input
+                  type="url"
+                  value={formData.cardmarketUrl}
+                  onChange={(e) => setFormData({ ...formData, cardmarketUrl: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                  placeholder="https://www.cardmarket.com/..."
                 />
               </div>
             </div>
@@ -291,39 +543,93 @@ export default function SealedPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
-              selectedTypes.length > 0
+              activeFilterCount > 0
                 ? "bg-brand-primary/20 border-brand-primary text-brand-primary"
                 : "bg-dark-800 border-dark-700 text-dark-300 hover:border-dark-600"
             }`}
           >
             <SlidersHorizontal size={18} />
-            Types
-            {selectedTypes.length > 0 && ` (${selectedTypes.length})`}
+            Filtres
+            {activeFilterCount > 0 && ` (${activeFilterCount})`}
           </button>
         </div>
 
         {showFilters && (
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4">
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {SEALED_TYPES.map((type) => (
-                <label
-                  key={type.value}
-                  className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedTypes.includes(type.value)}
-                    onChange={() => toggleTypeFilter(type.value)}
-                    className="w-4 h-4 accent-brand-primary cursor-pointer"
-                  />
-                  {type.label}
-                </label>
-              ))}
+          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                Type
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {SEALED_TYPES.map((type) => (
+                  <label
+                    key={type.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedTypes.includes(type.value)}
+                      onChange={() => toggleTypeFilter(type.value)}
+                      className="w-4 h-4 accent-brand-primary cursor-pointer"
+                    />
+                    {type.label}
+                  </label>
+                ))}
+              </div>
             </div>
-            {selectedTypes.length > 0 && (
+
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                Langue
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {LANGUAGES.map((lang) => (
+                  <label
+                    key={lang.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedLanguages.includes(lang.value)}
+                      onChange={() => toggleLanguage(lang.value)}
+                      className="w-4 h-4 accent-brand-primary cursor-pointer"
+                    />
+                    {lang.flag} {lang.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                État
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {CONDITIONS.map((c) => (
+                  <label
+                    key={c.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedConditions.includes(c.value)}
+                      onChange={() => toggleCondition(c.value)}
+                      className="w-4 h-4 accent-brand-secondary cursor-pointer"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
               <button
-                onClick={() => setSelectedTypes([])}
-                className="text-sm text-dark-400 hover:text-dark-200 transition mt-3"
+                onClick={() => {
+                  setSelectedTypes([]);
+                  setSelectedLanguages([]);
+                  setSelectedConditions([]);
+                }}
+                className="text-sm text-dark-400 hover:text-dark-200 transition"
               >
                 Réinitialiser
               </button>
@@ -375,7 +681,31 @@ export default function SealedPage() {
 
               return (
                 <div key={item.id} className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group">
-                  <div className="aspect-square bg-dark-900 overflow-hidden flex items-center justify-center">
+                  <div className="relative aspect-square bg-dark-900 overflow-hidden flex items-center justify-center">
+                    {item.quantity > 1 && (
+                      <span className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] font-semibold text-dark-50">
+                        ×{item.quantity}
+                      </span>
+                    )}
+                    <div className="absolute top-1 left-1 z-10 flex items-center gap-1">
+                      {item.language && getLanguage(item.language) && (
+                        <span
+                          title={getLanguage(item.language).label}
+                          className="px-1 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] leading-none"
+                        >
+                          {getLanguage(item.language).flag}
+                        </span>
+                      )}
+                      {item.condition && (
+                        <span
+                          className={`px-1 py-0.5 border rounded text-[9px] font-bold leading-none ${
+                            CONDITION_STYLES[item.condition] || "bg-dark-950/90 text-dark-200 border-dark-600"
+                          }`}
+                        >
+                          {item.condition}
+                        </span>
+                      )}
+                    </div>
                     {item.imageUrl ? (
                       <img
                         src={getImageSrc(item.imageUrl)}
@@ -396,9 +726,14 @@ export default function SealedPage() {
                   </div>
 
                   <div className="p-1.5 space-y-1">
-                    <h3 className="font-semibold text-dark-50 text-xs line-clamp-1" title={item.name}>
-                      {item.name}
-                    </h3>
+                    <div className="flex items-center justify-between gap-1">
+                      <h3 className="font-semibold text-dark-50 text-xs line-clamp-1" title={item.name}>
+                        {item.name}
+                      </h3>
+                      <span className="shrink-0 text-[10px] font-semibold text-dark-400">
+                        ×{item.quantity}
+                      </span>
+                    </div>
                     <p className="text-[10px] text-brand-secondary line-clamp-1">{item.type}</p>
 
                     <div className="grid grid-cols-2 gap-x-1 text-[10px]">
@@ -424,6 +759,13 @@ export default function SealedPage() {
                         className="flex-1 py-1 bg-green-500/10 text-green-400 rounded text-[10px] font-medium hover:bg-green-500/20 transition"
                       >
                         Vendre
+                      </button>
+                      <button
+                        onClick={() => openEditModal(item)}
+                        title="Modifier"
+                        className="px-1.5 py-1 bg-brand-primary/10 text-brand-primary rounded hover:bg-brand-primary/20 transition"
+                      >
+                        <Pencil size={11} />
                       </button>
                       <button
                         onClick={() => deleteSealed(item.id)}
@@ -467,6 +809,23 @@ export default function SealedPage() {
               </div>
 
               <form onSubmit={handleSell} className="space-y-4">
+                {sellingItem.quantity > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Quantité à vendre * (max {sellingItem.quantity})
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={sellingItem.quantity}
+                      required
+                      value={sellData.quantity}
+                      onChange={(e) => setSellData({ ...sellData, quantity: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-sm font-medium text-dark-200 mb-2">
                     Prix de vente (€) *
@@ -499,6 +858,193 @@ export default function SealedPage() {
                     Confirmer la vente
                   </button>
                   <button type="button" onClick={() => setSellingItem(null)} className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition">
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                  {editData.imageUrl ? (
+                    <img
+                      src={getImageSrc(editData.imageUrl)}
+                      alt={editData.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff size={24} className="text-dark-600" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                    <Pencil size={12} /> Modifier
+                  </p>
+                  <h2 className="text-lg font-semibold text-dark-50 truncate">
+                    {editingItem.name}
+                  </h2>
+                </div>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Nom *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editData.name}
+                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Type *</label>
+                    <select
+                      required
+                      value={editData.type}
+                      onChange={(e) => setEditData({ ...editData, type: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Choisir...</option>
+                      {SEALED_TYPES.map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Langue</label>
+                    <select
+                      value={editData.language}
+                      onChange={(e) => setEditData({ ...editData, language: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Non précisée</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.value} value={lang.value}>
+                          {lang.flag} {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">État</label>
+                    <select
+                      value={editData.condition}
+                      onChange={(e) => setEditData({ ...editData, condition: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Non précisé</option>
+                      {CONDITIONS.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Quantité *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={editData.quantity}
+                      onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix d'achat (€) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editData.purchasePrice}
+                      onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix actuel (€)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editData.currentPrice}
+                        onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
+                        className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                      />
+                      {editData.cardmarketUrl && (
+                        <a
+                          href={buildFilteredUrl(editData.cardmarketUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
+                          className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Lien Cardmarket</label>
+                  <input
+                    type="url"
+                    value={editData.cardmarketUrl}
+                    onChange={(e) => setEditData({ ...editData, cardmarketUrl: e.target.value })}
+                    placeholder="https://www.cardmarket.com/..."
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">URL de l'image</label>
+                  <input
+                    type="url"
+                    value={editData.imageUrl}
+                    onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Date d'achat</label>
+                  <input
+                    type="date"
+                    value={editData.purchaseDate}
+                    onChange={(e) => setEditData({ ...editData, purchaseDate: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingItem(null)}
+                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                  >
                     Annuler
                   </button>
                 </div>

@@ -48,6 +48,10 @@ export async function PUT(req, { params }) {
       data: {
         name: data.name,
         type: data.type,
+        language: data.language || null,
+        condition: data.condition || null,
+        priceSource: data.priceSource || null,
+        priceUpdatedAt: data.priceUpdatedAt ? new Date(data.priceUpdatedAt) : null,
         quantity: parseInt(data.quantity) || 1,
         purchasePrice: parseFloat(data.purchasePrice),
         currentPrice:

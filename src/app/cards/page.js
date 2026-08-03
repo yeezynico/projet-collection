@@ -2,18 +2,40 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
-import { Plus, Search, ImageOff, Tag, SlidersHorizontal, Pencil } from "lucide-react";
+import {
+  Plus,
+  Search,
+  ImageOff,
+  Tag,
+  SlidersHorizontal,
+  Pencil,
+  Link2,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
-import { CARD_CATEGORIES } from "@/lib/categories";
+import {
+  CARD_CATEGORIES,
+  LANGUAGES,
+  CONDITIONS,
+  CONDITION_STYLES,
+  getLanguage,
+} from "@/lib/categories";
+import { buildFilteredUrl } from "@/lib/cardmarket";
 
 const emptyForm = {
   name: "",
   extension: "",
+  number: "",
   category: "",
+  language: "FR",
+  condition: "NM",
   quantity: "1",
   purchasePrice: "",
   currentPrice: "",
+  priceSource: "",
+  priceUpdatedAt: "",
   imageUrl: "",
   cardmarketUrl: "",
   purchaseDate: new Date().toISOString().split("T")[0],
@@ -35,14 +57,75 @@ export default function CardsPage() {
     saleDate: new Date().toISOString().split("T")[0],
   });
   const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedLanguages, setSelectedLanguages] = useState([]);
+  const [selectedConditions, setSelectedConditions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
+  const [lookupUrl, setLookupUrl] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [lookupInfo, setLookupInfo] = useState("");
 
-  function toggleCategory(cat) {
-    setSelectedCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
+  function toggleIn(setter) {
+    return (value) =>
+      setter((prev) =>
+        prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
+      );
+  }
+
+  const toggleCategory = toggleIn(setSelectedCategories);
+  const toggleLanguage = toggleIn(setSelectedLanguages);
+  const toggleCondition = toggleIn(setSelectedConditions);
+
+  const activeFilterCount =
+    selectedCategories.length + selectedLanguages.length + selectedConditions.length;
+
+  /** Remplit le formulaire à partir d'un lien Cardmarket. */
+  async function handleLookup() {
+    if (!lookupUrl.trim()) return;
+
+    setLookupLoading(true);
+    setLookupError("");
+    setLookupInfo("");
+
+    try {
+      const res = await fetch(`/api/lookup?url=${encodeURIComponent(lookupUrl.trim())}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLookupError(data.error || "Récupération impossible");
+        return;
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        name: data.name || prev.name,
+        extension: data.extension || prev.extension,
+        number: data.number || prev.number,
+        category: data.category || prev.category,
+        imageUrl: data.imageUrl || prev.imageUrl,
+        cardmarketUrl: data.cardmarketUrl || lookupUrl.trim(),
+        currentPrice:
+          data.suggestedPrice != null ? data.suggestedPrice.toFixed(2) : prev.currentPrice,
+        priceSource: data.priceSource || "",
+        priceUpdatedAt: data.priceUpdatedAt || "",
+      }));
+
+      if (data.suggestedPrice != null) {
+        setLookupInfo(
+          `${data.name} récupérée. Prix indicatif ${data.suggestedPrice.toFixed(2)} € — ${data.priceSource}, mis à jour le ${data.priceUpdatedAt}. Moyenne européenne toutes langues : vérifiez sur Cardmarket.`
+        );
+      } else {
+        setLookupInfo(
+          `${data.name || "Produit"} récupéré. Aucun prix de référence disponible, saisissez-le manuellement.`
+        );
+      }
+    } catch {
+      setLookupError("Erreur réseau lors de la récupération");
+    } finally {
+      setLookupLoading(false);
+    }
   }
 
   // Debounce la recherche pour éviter une requête réseau à chaque frappe
@@ -93,6 +176,9 @@ export default function CardsPage() {
         const newCard = await res.json();
         setCards((prev) => [newCard, ...prev]);
         setFormData(emptyForm);
+        setLookupUrl("");
+        setLookupInfo("");
+        setLookupError("");
         setShowForm(false);
       }
     } catch (error) {
@@ -120,10 +206,15 @@ export default function CardsPage() {
     setEditData({
       name: card.name ?? "",
       extension: card.extension ?? "",
+      number: card.number ?? "",
       category: card.category ?? "",
+      language: card.language ?? "",
+      condition: card.condition ?? "",
       quantity: card.quantity.toString(),
       purchasePrice: card.purchasePrice.toString(),
       currentPrice: (card.currentPrice ?? card.purchasePrice).toString(),
+      priceSource: card.priceSource ?? "",
+      priceUpdatedAt: card.priceUpdatedAt ?? "",
       imageUrl: card.imageUrl ?? "",
       cardmarketUrl: card.cardmarketUrl ?? "",
       purchaseDate: new Date(card.purchaseDate).toISOString().split("T")[0],
@@ -212,10 +303,15 @@ export default function CardsPage() {
     }
   }
 
-  const filteredCards =
-    selectedCategories.length === 0
-      ? cards
-      : cards.filter((card) => selectedCategories.includes(card.category));
+  const filteredCards = cards.filter((card) => {
+    if (selectedCategories.length > 0 && !selectedCategories.includes(card.category))
+      return false;
+    if (selectedLanguages.length > 0 && !selectedLanguages.includes(card.language))
+      return false;
+    if (selectedConditions.length > 0 && !selectedConditions.includes(card.condition))
+      return false;
+    return true;
+  });
 
   const totalInvested = filteredCards.reduce(
     (sum, card) => sum + card.purchasePrice * card.quantity,
@@ -258,6 +354,56 @@ export default function CardsPage() {
             <h2 className="text-xl font-semibold text-dark-50 mb-4">
               Ajouter une nouvelle carte
             </h2>
+
+            {/* Remplissage automatique depuis un lien Cardmarket */}
+            <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                <Link2 size={16} className="text-brand-primary" />
+                Remplissage automatique depuis Cardmarket
+              </label>
+
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="url"
+                  value={lookupUrl}
+                  onChange={(e) => setLookupUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleLookup();
+                    }
+                  }}
+                  placeholder="https://www.cardmarket.com/fr/Pokemon/Products/Singles/..."
+                  className="flex-1 min-w-64 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleLookup}
+                  disabled={lookupLoading || !lookupUrl.trim()}
+                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold text-sm hover:bg-brand-primary/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {lookupLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recherche...
+                    </>
+                  ) : (
+                    "Récupérer"
+                  )}
+                </button>
+              </div>
+
+              {lookupError && (
+                <p className="text-sm text-red-400">{lookupError}</p>
+              )}
+              {lookupInfo && (
+                <p className="text-sm text-green-400">{lookupInfo}</p>
+              )}
+              <p className="text-xs text-dark-500">
+                Récupère nom, extension, numéro, rareté et photo. Le prix proposé est une
+                moyenne européenne toutes langues — ajustez-le avec le bouton « Vérifier sur
+                Cardmarket ».
+              </p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
@@ -312,6 +458,61 @@ export default function CardsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Numéro
+                </label>
+                <input
+                  type="text"
+                  value={formData.number}
+                  onChange={(e) =>
+                    setFormData({ ...formData, number: e.target.value })
+                  }
+                  placeholder="ex: 186"
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Langue
+                </label>
+                <select
+                  value={formData.language}
+                  onChange={(e) =>
+                    setFormData({ ...formData, language: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                >
+                  <option value="">Non précisée</option>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.flag} {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  État
+                </label>
+                <select
+                  value={formData.condition}
+                  onChange={(e) =>
+                    setFormData({ ...formData, condition: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                >
+                  <option value="">Non précisé</option>
+                  {CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
                   Quantité
                 </label>
                 <input
@@ -345,16 +546,35 @@ export default function CardsPage() {
                 <label className="block text-sm font-medium text-dark-200 mb-2">
                   Prix actuel (€)
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.currentPrice}
-                  onChange={(e) =>
-                    setFormData({ ...formData, currentPrice: e.target.value })
-                  }
-                  placeholder="= prix d'achat si vide"
-                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={formData.currentPrice}
+                    onChange={(e) =>
+                      setFormData({ ...formData, currentPrice: e.target.value })
+                    }
+                    placeholder="= prix d'achat si vide"
+                    className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                  />
+                  {formData.cardmarketUrl && (
+                    <a
+                      href={buildFilteredUrl(formData.cardmarketUrl)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
+                      className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                    >
+                      <ExternalLink size={16} />
+                    </a>
+                  )}
+                </div>
+                {formData.priceSource && (
+                  <p className="text-[11px] text-dark-500 mt-1">
+                    {formData.priceSource}
+                    {formData.priceUpdatedAt && ` · maj ${formData.priceUpdatedAt}`}
+                  </p>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -369,6 +589,21 @@ export default function CardsPage() {
                   }
                   className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                   placeholder="https://..."
+                />
+              </div>
+
+              <div className="md:col-span-2 lg:col-span-3">
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Lien Cardmarket
+                </label>
+                <input
+                  type="url"
+                  value={formData.cardmarketUrl}
+                  onChange={(e) =>
+                    setFormData({ ...formData, cardmarketUrl: e.target.value })
+                  }
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
+                  placeholder="https://www.cardmarket.com/..."
                 />
               </div>
 
@@ -435,39 +670,93 @@ export default function CardsPage() {
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition ${
-              selectedCategories.length > 0
+              activeFilterCount > 0
                 ? "bg-brand-primary/20 border-brand-primary text-brand-primary"
                 : "bg-dark-800 border-dark-700 text-dark-300 hover:border-dark-600"
             }`}
           >
             <SlidersHorizontal size={18} />
-            Catégories
-            {selectedCategories.length > 0 && ` (${selectedCategories.length})`}
+            Filtres
+            {activeFilterCount > 0 && ` (${activeFilterCount})`}
           </button>
         </div>
 
         {showFilters && (
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4">
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
-              {CARD_CATEGORIES.map((cat) => (
-                <label
-                  key={cat.value}
-                  className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedCategories.includes(cat.value)}
-                    onChange={() => toggleCategory(cat.value)}
-                    className="w-4 h-4 accent-brand-primary cursor-pointer"
-                  />
-                  {cat.label}
-                </label>
-              ))}
+          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                Catégorie
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {CARD_CATEGORIES.map((cat) => (
+                  <label
+                    key={cat.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCategories.includes(cat.value)}
+                      onChange={() => toggleCategory(cat.value)}
+                      className="w-4 h-4 accent-brand-primary cursor-pointer"
+                    />
+                    {cat.label}
+                  </label>
+                ))}
+              </div>
             </div>
-            {selectedCategories.length > 0 && (
+
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                Langue
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {LANGUAGES.map((lang) => (
+                  <label
+                    key={lang.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedLanguages.includes(lang.value)}
+                      onChange={() => toggleLanguage(lang.value)}
+                      className="w-4 h-4 accent-brand-primary cursor-pointer"
+                    />
+                    {lang.flag} {lang.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
+                État
+              </p>
+              <div className="flex flex-wrap gap-x-5 gap-y-2">
+                {CONDITIONS.map((c) => (
+                  <label
+                    key={c.value}
+                    className="flex items-center gap-2 text-sm text-dark-200 cursor-pointer select-none"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedConditions.includes(c.value)}
+                      onChange={() => toggleCondition(c.value)}
+                      className="w-4 h-4 accent-brand-secondary cursor-pointer"
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {activeFilterCount > 0 && (
               <button
-                onClick={() => setSelectedCategories([])}
-                className="text-sm text-dark-400 hover:text-dark-200 transition mt-3"
+                onClick={() => {
+                  setSelectedCategories([]);
+                  setSelectedLanguages([]);
+                  setSelectedConditions([]);
+                }}
+                className="text-sm text-dark-400 hover:text-dark-200 transition"
               >
                 Réinitialiser
               </button>
@@ -538,12 +827,31 @@ export default function CardsPage() {
                   key={card.id}
                   className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group"
                 >
-                  <div className="relative aspect-[3/4] bg-dark-900 overflow-hidden flex items-center justify-center">
+                  <div className="relative aspect-3/4 bg-dark-900 overflow-hidden flex items-center justify-center">
                     {card.quantity > 1 && (
                       <span className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] font-semibold text-dark-50">
                         ×{card.quantity}
                       </span>
                     )}
+                    <div className="absolute top-1 left-1 z-10 flex items-center gap-1">
+                      {card.language && getLanguage(card.language) && (
+                        <span
+                          title={getLanguage(card.language).label}
+                          className="px-1 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] leading-none"
+                        >
+                          {getLanguage(card.language).flag}
+                        </span>
+                      )}
+                      {card.condition && (
+                        <span
+                          className={`px-1 py-0.5 border rounded text-[9px] font-bold leading-none ${
+                            CONDITION_STYLES[card.condition] || "bg-dark-950/90 text-dark-200 border-dark-600"
+                          }`}
+                        >
+                          {card.condition}
+                        </span>
+                      )}
+                    </div>
                     {card.imageUrl ? (
                       <img
                         src={getImageSrc(card.imageUrl)}
@@ -773,8 +1081,8 @@ export default function CardsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
                     <label className="block text-sm font-medium text-dark-200 mb-2">
                       Extension
                     </label>
@@ -785,6 +1093,20 @@ export default function CardsPage() {
                       className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Numéro
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.number}
+                      onChange={(e) => setEditData({ ...editData, number: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-dark-200 mb-2">
                       Catégorie
@@ -798,6 +1120,40 @@ export default function CardsPage() {
                       {CARD_CATEGORIES.map((cat) => (
                         <option key={cat.value} value={cat.value}>
                           {cat.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Langue
+                    </label>
+                    <select
+                      value={editData.language}
+                      onChange={(e) => setEditData({ ...editData, language: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Non précisée</option>
+                      {LANGUAGES.map((lang) => (
+                        <option key={lang.value} value={lang.value}>
+                          {lang.flag} {lang.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      État
+                    </label>
+                    <select
+                      value={editData.condition}
+                      onChange={(e) => setEditData({ ...editData, condition: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Non précisé</option>
+                      {CONDITIONS.map((c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
                         </option>
                       ))}
                     </select>
@@ -835,14 +1191,47 @@ export default function CardsPage() {
                     <label className="block text-sm font-medium text-dark-200 mb-2">
                       Prix actuel (€)
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={editData.currentPrice}
-                      onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={editData.currentPrice}
+                        onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
+                        className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                      />
+                      {editData.cardmarketUrl && (
+                        <a
+                          href={buildFilteredUrl(editData.cardmarketUrl)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
+                          className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                        >
+                          <ExternalLink size={16} />
+                        </a>
+                      )}
+                    </div>
                   </div>
+                </div>
+
+                {editData.priceSource && (
+                  <p className="text-xs text-dark-500 -mt-1">
+                    Prix indicatif : {editData.priceSource}
+                    {editData.priceUpdatedAt && ` · maj ${editData.priceUpdatedAt}`}
+                  </p>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Lien Cardmarket
+                  </label>
+                  <input
+                    type="url"
+                    value={editData.cardmarketUrl}
+                    onChange={(e) => setEditData({ ...editData, cardmarketUrl: e.target.value })}
+                    placeholder="https://www.cardmarket.com/..."
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
                 </div>
 
                 <div>
