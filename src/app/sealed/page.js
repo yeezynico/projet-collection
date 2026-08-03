@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
-import { Plus, Search, ImageOff, Tag, SlidersHorizontal } from "lucide-react";
+import { Plus, Search, ImageOff, Tag, SlidersHorizontal, Pencil } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
 import { SEALED_TYPES } from "@/lib/categories";
@@ -35,6 +35,8 @@ export default function SealedPage() {
   });
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editData, setEditData] = useState(emptyForm);
 
   function toggleTypeFilter(type) {
     setSelectedTypes((prev) =>
@@ -103,6 +105,53 @@ export default function SealedPage() {
       if (!res.ok) setSealed(previous);
     } catch (error) {
       console.error("Error:", error);
+      setSealed(previous);
+    }
+  }
+
+  function openEditModal(item) {
+    setEditingItem(item);
+    setEditData({
+      name: item.name ?? "",
+      type: item.type ?? "",
+      quantity: item.quantity.toString(),
+      purchasePrice: item.purchasePrice.toString(),
+      currentPrice: (item.currentPrice ?? item.purchasePrice).toString(),
+      imageUrl: item.imageUrl ?? "",
+      cardmarketUrl: item.cardmarketUrl ?? "",
+      purchaseDate: new Date(item.purchaseDate).toISOString().split("T")[0],
+    });
+  }
+
+  async function handleEditSubmit(e) {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    const payload = {
+      ...editData,
+      quantity: parseInt(editData.quantity) || 1,
+      purchasePrice: parseFloat(editData.purchasePrice) || 0,
+      currentPrice:
+        editData.currentPrice === ""
+          ? parseFloat(editData.purchasePrice) || 0
+          : parseFloat(editData.currentPrice),
+    };
+
+    const previous = sealed;
+    setSealed((prev) =>
+      prev.map((s) => (s.id === editingItem.id ? { ...s, ...payload } : s))
+    );
+    setEditingItem(null);
+
+    try {
+      const res = await fetch(`/api/sealed/${editingItem.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) setSealed(previous);
+    } catch (error) {
+      console.error("Error updating sealed item:", error);
       setSealed(previous);
     }
   }
@@ -446,6 +495,13 @@ export default function SealedPage() {
                         Vendre
                       </button>
                       <button
+                        onClick={() => openEditModal(item)}
+                        title="Modifier"
+                        className="px-1.5 py-1 bg-brand-primary/10 text-brand-primary rounded hover:bg-brand-primary/20 transition"
+                      >
+                        <Pencil size={11} />
+                      </button>
+                      <button
                         onClick={() => deleteSealed(item.id)}
                         title="Supprimer"
                         className="px-1.5 py-1 bg-red-500/10 text-red-400 rounded text-[10px] font-medium hover:bg-red-500/20 transition"
@@ -536,6 +592,137 @@ export default function SealedPage() {
                     Confirmer la vente
                   </button>
                   <button type="button" onClick={() => setSellingItem(null)} className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition">
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editingItem && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                  {editData.imageUrl ? (
+                    <img
+                      src={getImageSrc(editData.imageUrl)}
+                      alt={editData.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff size={24} className="text-dark-600" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                    <Pencil size={12} /> Modifier
+                  </p>
+                  <h2 className="text-lg font-semibold text-dark-50 truncate">
+                    {editingItem.name}
+                  </h2>
+                </div>
+              </div>
+
+              <form onSubmit={handleEditSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Nom *</label>
+                  <input
+                    type="text"
+                    required
+                    value={editData.name}
+                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Type *</label>
+                  <select
+                    required
+                    value={editData.type}
+                    onChange={(e) => setEditData({ ...editData, type: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    <option value="">Choisir...</option>
+                    {SEALED_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Quantité *</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={editData.quantity}
+                      onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix d'achat (€) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={editData.purchasePrice}
+                      onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix actuel (€)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editData.currentPrice}
+                      onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">URL de l'image</label>
+                  <input
+                    type="url"
+                    value={editData.imageUrl}
+                    onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Date d'achat</label>
+                  <input
+                    type="date"
+                    value={editData.purchaseDate}
+                    onChange={(e) => setEditData({ ...editData, purchaseDate: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                  >
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingItem(null)}
+                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                  >
                     Annuler
                   </button>
                 </div>

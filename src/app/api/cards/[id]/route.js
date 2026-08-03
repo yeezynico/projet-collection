@@ -51,9 +51,12 @@ export async function PUT(req, { params }) {
         category: data.category,
         quantity: parseInt(data.quantity) || 1,
         purchasePrice: parseFloat(data.purchasePrice),
-        currentPrice: data.currentPrice
-          ? parseFloat(data.currentPrice)
-          : undefined,
+        currentPrice:
+          data.currentPrice !== undefined &&
+          data.currentPrice !== null &&
+          data.currentPrice !== ""
+            ? parseFloat(data.currentPrice)
+            : parseFloat(data.purchasePrice),
         imageUrl: data.imageUrl,
         cardmarketUrl: data.cardmarketUrl,
         purchaseDate: data.purchaseDate
