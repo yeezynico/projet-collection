@@ -17,18 +17,29 @@ export const DEFAULT_CM_FILTERS = {
 };
 
 /**
+ * Analyse une URL en tolérant l'absence de protocole : un lien copié
+ * depuis la barre d'adresse arrive souvent sous la forme
+ * « cardmarket.com/fr/... », que `new URL()` refuse.
+ */
+function toUrl(raw) {
+  if (!raw) return null;
+  const trimmed = String(raw).trim();
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+
+  try {
+    return new URL(withScheme);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Construit l'URL Cardmarket pré-filtrée (pays vendeur / langue / état minimum).
  * Les paramètres existants de l'URL d'origine sont remplacés.
  */
 export function buildFilteredUrl(baseUrl, filters = DEFAULT_CM_FILTERS) {
-  if (!baseUrl) return null;
-
-  let url;
-  try {
-    url = new URL(baseUrl);
-  } catch {
-    return null;
-  }
+  const url = toUrl(baseUrl);
+  if (!url) return null;
 
   if (!url.hostname.endsWith("cardmarket.com")) return baseUrl;
 
@@ -52,12 +63,8 @@ export function buildFilteredUrl(baseUrl, filters = DEFAULT_CM_FILTERS) {
  * Ex. .../Singles/Silver-Tempest/Lugia-V-V3-SIT186 -> { setCode: "SIT", number: "186" }
  */
 export function parseCardmarketUrl(rawUrl) {
-  let url;
-  try {
-    url = new URL(rawUrl);
-  } catch {
-    return null;
-  }
+  const url = toUrl(rawUrl);
+  if (!url) return null;
 
   if (!url.hostname.endsWith("cardmarket.com")) return null;
 
@@ -85,6 +92,8 @@ export function parseCardmarketUrl(rawUrl) {
     kind,
     slug,
     suffix,
+    // URL complète : le lien collé peut être dépourvu de protocole.
+    href: url.toString(),
     setName: setSlug.replace(/-/g, " "),
     productName: slug.replace(/-/g, " "),
     cardName,

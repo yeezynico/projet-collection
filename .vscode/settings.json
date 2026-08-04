@@ -1,0 +1,15 @@
+{
+  // Enregistrement automatique : sans modification en attente dans l'éditeur,
+  // VS Code recharge silencieusement les fichiers modifiés sur le disque.
+  // C'est ce qui évite l'erreur « the content of the file is newer » et le
+  // bouton « Overwrite » qui écrase les modifications faites hors de l'éditeur.
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+
+  // Recharge le contenu depuis le disque sans demander quand c'est sans risque.
+  "files.refactoring.autoSave": true,
+
+  // Évite que des espaces de fin créent de faux conflits.
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true
+}

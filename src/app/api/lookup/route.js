@@ -8,6 +8,7 @@ import {
 } from "@/lib/cardmarket";
 import { SET_CODE_TO_IDS, SET_NAME_TO_IDS } from "@/lib/pokemonSets";
 import { findSealedProduct } from "@/lib/tcgcsv";
+import { usdToEur } from "@/lib/currency";
 
 // TCGdex fournit les données en français et des prix Cardmarket quotidiens.
 const API_BASE = "https://api.tcgdex.net/v2/fr";
@@ -152,16 +153,41 @@ export async function GET(req) {
         console.error("Sealed product lookup failed:", e);
       }
 
+      // Aucune cotation Cardmarket n'est accessible pour les scellés :
+      // on convertit le prix TCGplayer, en l'annonçant clairement comme indicatif.
+      let suggestedPrice = null;
+      let priceSource = null;
+      let priceUpdatedAt = null;
+
+      if (product?.priceUsd) {
+        const converted = await usdToEur(product.priceUsd);
+        if (converted) {
+          suggestedPrice = Math.round(converted.value * 100) / 100;
+          priceSource = "TCGplayer US converti (indicatif)";
+          priceUpdatedAt = converted.date;
+        }
+      }
+
+      let message;
+      if (product && suggestedPrice != null) {
+        message = `« ${product.name} » identifié comme ${type}. Photo récupérée et prix indicatif de ${suggestedPrice.toFixed(2)} € — converti du marché américain, à vérifier sur Cardmarket.`;
+      } else if (product) {
+        message = `« ${product.name} » identifié comme ${type}, photo récupérée. Prix à saisir manuellement.`;
+      } else {
+        message = `Identifié comme « ${type} ». Photo et prix à compléter manuellement.`;
+      }
+
       return NextResponse.json({
         kind: "sealed",
         name: product?.name || parsed.productName,
         type,
         imageUrl: product?.imageUrl || null,
-        cardmarketUrl: rawUrl,
+        cardmarketUrl: parsed.href,
+        suggestedPrice,
+        priceSource,
+        priceUpdatedAt,
         partial: true,
-        message: product
-          ? `« ${product.name} » identifié comme ${type}, photo récupérée. Prix à saisir manuellement.`
-          : `Identifié comme « ${type} ». Photo et prix à compléter manuellement.`,
+        message,
       });
     }
 
@@ -198,7 +224,7 @@ export async function GET(req) {
       );
     }
 
-    const results = cards.map((c) => serializeCard(c, rawUrl));
+    const results = cards.map((c) => serializeCard(c, parsed.href));
 
     // On renvoie toujours les candidats : avec un seul résultat cela permet
     // d'afficher l'aperçu, avec plusieurs de choisir la bonne version.

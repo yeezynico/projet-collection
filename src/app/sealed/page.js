@@ -24,6 +24,7 @@ import {
 } from "@/lib/categories";
 import { buildFilteredUrl } from "@/lib/cardmarket";
 import ItemDetailModal from "@/components/ItemDetailModal";
+import CardmarketPriceModal from "@/components/CardmarketPriceModal";
 
 const emptyForm = {
   name: "",
@@ -61,6 +62,7 @@ export default function SealedPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
+  const [priceHelper, setPriceHelper] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
   const [lookupUrl, setLookupUrl] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -498,15 +500,20 @@ export default function SealedPage() {
                     className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50"
                   />
                   {formData.cardmarketUrl && (
-                    <a
-                      href={buildFilteredUrl(formData.cardmarketUrl)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
-                      className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPriceHelper({
+                          url: formData.cardmarketUrl,
+                          language: formData.language,
+                          target: "form",
+                        })
+                      }
+                      title="Relever le prix français sur Cardmarket"
+                      className="flex items-center gap-1.5 px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0 text-sm whitespace-nowrap"
                     >
-                      <ExternalLink size={16} />
-                    </a>
+                      <ExternalLink size={15} /> Relever
+                    </button>
                   )}
                 </div>
                 {formData.priceSource && (
@@ -1026,15 +1033,20 @@ export default function SealedPage() {
                         className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                       />
                       {editData.cardmarketUrl && (
-                        <a
-                          href={buildFilteredUrl(editData.cardmarketUrl)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Vérifier sur Cardmarket (vendeurs FR, langue FR, Near Mint+)"
-                          className="flex items-center px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0"
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPriceHelper({
+                              url: editData.cardmarketUrl,
+                              language: editData.language,
+                              target: "edit",
+                            })
+                          }
+                          title="Relever le prix français sur Cardmarket"
+                          className="flex items-center gap-1.5 px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0 text-sm whitespace-nowrap"
                         >
-                          <ExternalLink size={16} />
-                        </a>
+                          <ExternalLink size={15} /> Relever
+                        </button>
                       )}
                     </div>
                   </div>
@@ -1090,6 +1102,33 @@ export default function SealedPage() {
               </form>
             </div>
           </div>
+        )}
+
+
+        {priceHelper && (
+          <CardmarketPriceModal
+            cardmarketUrl={priceHelper.url}
+            language={priceHelper.language}
+            onApply={(price) => {
+              const value = price.toFixed(2);
+              if (priceHelper.target === "edit") {
+                setEditData((prev) => ({
+                  ...prev,
+                  currentPrice: value,
+                  priceSource: "Relevé Cardmarket (vendeurs FR)",
+                  priceUpdatedAt: new Date().toISOString().slice(0, 10),
+                }));
+              } else {
+                setFormData((prev) => ({
+                  ...prev,
+                  currentPrice: value,
+                  priceSource: "Relevé Cardmarket (vendeurs FR)",
+                  priceUpdatedAt: new Date().toISOString().slice(0, 10),
+                }));
+              }
+            }}
+            onClose={() => setPriceHelper(null)}
+          />
         )}
 
         <ItemDetailModal

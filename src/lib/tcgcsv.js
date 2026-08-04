@@ -64,6 +64,13 @@ export async function fetchProducts(groupId) {
   return data?.results || [];
 }
 
+export async function fetchPrices(groupId) {
+  const res = await fetch(`${BASE}/${POKEMON_CATEGORY}/${groupId}/prices`, CACHE);
+  if (!res.ok) return [];
+  const data = await res.json();
+  return data?.results || [];
+}
+
 /**
  * Trouve l'extension dont le nom ouvre celui du produit.
  * On retient la correspondance la plus longue : « Crown Zenith: Galarian
@@ -120,11 +127,23 @@ export async function findSealedProduct(productName) {
   // En dessous de ce seuil, la correspondance relève du hasard.
   if (!best || bestScore < 2) return null;
 
+  // Prix TCGplayer, seule cotation accessible pour les scellés (en dollars).
+  let priceUsd = null;
+  try {
+    const prices = await fetchPrices(group.groupId);
+    const match = prices.find((p) => p.productId === best.productId);
+    const value = match?.marketPrice ?? match?.midPrice ?? match?.lowPrice;
+    if (typeof value === "number" && value > 0) priceUsd = value;
+  } catch {
+    // sans prix, le reste de la fiche demeure exploitable
+  }
+
   return {
     name: best.name,
     imageUrl: highResImage(best.imageUrl),
     productId: best.productId,
     groupName: cleanGroupName(group.name),
+    priceUsd,
     score: bestScore,
   };
 }

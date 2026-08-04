@@ -6,7 +6,6 @@ import { LogOut } from "lucide-react";
 
 export default function SettingsPage() {
   const { data: session } = useSession();
-
   return (
     <DashboardLayout user={session?.user}>
       <div className="space-y-6 max-w-2xl">
