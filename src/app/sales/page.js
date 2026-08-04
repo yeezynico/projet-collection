@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
 import { useSession } from "next-auth/react";
-import { Camera, ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2 } from "lucide-react";
+import { Camera, ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
 import { CARD_CATEGORIES, SEALED_TYPES } from "@/lib/categories";
 
@@ -82,6 +82,17 @@ export default function SalesPage() {
   const [preview, setPreview] = useState(null);
   const [periodType, setPeriodType] = useState("all");
   const [periodOffset, setPeriodOffset] = useState(0);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [addData, setAddData] = useState({
+    itemName: "",
+    itemType: "card",
+    itemCategory: "",
+    quantity: "1",
+    purchasePrice: "",
+    salePrice: "",
+    saleDate: new Date().toISOString().split("T")[0],
+    imageUrl: "",
+  });
   const [editingSale, setEditingSale] = useState(null);
   const [editData, setEditData] = useState({
     quantity: "1",
@@ -148,6 +159,42 @@ export default function SalesPage() {
     setSelectedCategories((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
+  }
+
+  /** Enregistre une vente sans article lié : utile pour une vente oubliée. */
+  async function handleAddSale(e) {
+    e.preventDefault();
+
+    try {
+      const res = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...addData,
+          quantity: parseInt(addData.quantity) || 1,
+          purchasePrice: parseFloat(addData.purchasePrice) || 0,
+          salePrice: parseFloat(addData.salePrice) || 0,
+        }),
+      });
+
+      if (res.ok) {
+        const created = await res.json();
+        setSales((prev) => [created, ...prev]);
+        setAddData({
+          itemName: "",
+          itemType: "card",
+          itemCategory: "",
+          quantity: "1",
+          purchasePrice: "",
+          salePrice: "",
+          saleDate: new Date().toISOString().split("T")[0],
+          imageUrl: "",
+        });
+        setShowAddForm(false);
+      }
+    } catch (error) {
+      console.error("Error adding sale:", error);
+    }
   }
 
   function openEditModal(sale) {
@@ -233,12 +280,21 @@ export default function SalesPage() {
   return (
     <DashboardLayout user={session?.user}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-dark-50">Historique des ventes</h1>
-          <p className="text-dark-400 mt-1">
-            {filteredSales.length} vente{filteredSales.length > 1 ? "s" : ""}
-            {filteredSales.length !== sales.length && ` sur ${sales.length}`}
-          </p>
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-dark-50">Historique des ventes</h1>
+            <p className="text-dark-400 mt-1">
+              {filteredSales.length} vente{filteredSales.length > 1 ? "s" : ""}
+              {filteredSales.length !== sales.length && ` sur ${sales.length}`}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+          >
+            <Plus size={20} />
+            Ajouter une vente
+          </button>
         </div>
 
         {/* Sélecteur de période */}
@@ -516,6 +572,167 @@ export default function SalesPage() {
                 alt={preview.name}
                 className="w-full h-full object-cover"
               />
+            </div>
+          </div>
+        )}
+
+        {/* Ajout d'une vente non rattachée à la collection */}
+        {showAddForm && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
+              <div className="mb-5">
+                <h2 className="text-lg font-semibold text-dark-50">
+                  Ajouter une vente
+                </h2>
+                <p className="text-sm text-dark-400 mt-1">
+                  Pour une vente réalisée sans que l'article soit dans votre
+                  collection. Rien ne sera retiré des cartes ou scellés.
+                </p>
+              </div>
+
+              <form onSubmit={handleAddSale} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Nom de l'article *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={addData.itemName}
+                    onChange={(e) => setAddData({ ...addData, itemName: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Type *
+                    </label>
+                    <select
+                      required
+                      value={addData.itemType}
+                      onChange={(e) =>
+                        setAddData({ ...addData, itemType: e.target.value, itemCategory: "" })
+                      }
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      {TYPE_OPTIONS.map((t) => (
+                        <option key={t.value} value={t.value}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Catégorie
+                    </label>
+                    <select
+                      value={addData.itemCategory}
+                      onChange={(e) =>
+                        setAddData({ ...addData, itemCategory: e.target.value })
+                      }
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    >
+                      <option value="">Non précisée</option>
+                      {(addData.itemType === "card" ? CARD_CATEGORIES : SEALED_TYPES).map(
+                        (c) => (
+                          <option key={c.value} value={c.value}>
+                            {c.label}
+                          </option>
+                        )
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Quantité *
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={addData.quantity}
+                      onChange={(e) => setAddData({ ...addData, quantity: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Prix d'achat (€) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={addData.purchasePrice}
+                      onChange={(e) =>
+                        setAddData({ ...addData, purchasePrice: e.target.value })
+                      }
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Prix de vente (€) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      value={addData.salePrice}
+                      onChange={(e) => setAddData({ ...addData, salePrice: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Date de vente
+                  </label>
+                  <input
+                    type="date"
+                    value={addData.saleDate}
+                    onChange={(e) => setAddData({ ...addData, saleDate: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    URL de l'image
+                  </label>
+                  <input
+                    type="url"
+                    value={addData.imageUrl}
+                    onChange={(e) => setAddData({ ...addData, imageUrl: e.target.value })}
+                    placeholder="https://..."
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition"
+                  >
+                    Enregistrer la vente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

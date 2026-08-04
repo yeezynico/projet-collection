@@ -45,14 +45,16 @@ export const CONDITIONS = [
 ];
 
 // Classes Tailwind explicites (le JIT ne peut pas générer des noms construits).
+// Dégradé façon Cardmarket : bleu pour le neuf, vert très bon,
+// puis jaune / orange / rouge à mesure que l'état se dégrade.
 export const CONDITION_STYLES = {
-  MT: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  MT: "bg-blue-500/15 text-blue-300 border-blue-500/30",
   NM: "bg-green-500/15 text-green-300 border-green-500/30",
   EX: "bg-lime-500/15 text-lime-300 border-lime-500/30",
   GD: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
   LP: "bg-orange-500/15 text-orange-300 border-orange-500/30",
   PL: "bg-red-500/15 text-red-300 border-red-500/30",
-  PO: "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  PO: "bg-red-600/20 text-red-400 border-red-600/40",
 };
 
 export function getLanguage(value) {

@@ -23,6 +23,7 @@ import {
   getLanguage,
 } from "@/lib/categories";
 import { buildFilteredUrl } from "@/lib/cardmarket";
+import ItemDetailModal from "@/components/ItemDetailModal";
 
 const emptyForm = {
   name: "",
@@ -59,6 +60,7 @@ export default function SealedPage() {
   const [selectedConditions, setSelectedConditions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [detailItem, setDetailItem] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
   const [lookupUrl, setLookupUrl] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
@@ -712,7 +714,10 @@ export default function SealedPage() {
 
               return (
                 <div key={item.id} className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group">
-                  <div className="relative aspect-square bg-dark-900 overflow-hidden flex items-center justify-center">
+                  <div
+                    onClick={() => setDetailItem(item)}
+                    className="relative aspect-square bg-dark-900 overflow-hidden flex items-center justify-center cursor-pointer"
+                  >
                     {item.quantity > 1 && (
                       <span className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] font-semibold text-dark-50">
                         ×{item.quantity}
@@ -757,7 +762,10 @@ export default function SealedPage() {
                   </div>
 
                   <div className="p-1.5 space-y-1">
-                    <div className="flex items-center justify-between gap-1">
+                    <div
+                      onClick={() => setDetailItem(item)}
+                      className="flex items-center justify-between gap-1 cursor-pointer"
+                    >
                       <h3 className="font-semibold text-dark-50 text-xs line-clamp-1" title={item.name}>
                         {item.name}
                       </h3>
@@ -1083,6 +1091,12 @@ export default function SealedPage() {
             </div>
           </div>
         )}
+
+        <ItemDetailModal
+          item={detailItem}
+          kind="sealed"
+          onClose={() => setDetailItem(null)}
+        />
       </div>
     </DashboardLayout>
   );

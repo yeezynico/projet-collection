@@ -165,13 +165,20 @@ export function mapProductKindToType(kind = "") {
  */
 export function mapRarityToCategory(rarity = "", subtypes = []) {
   const r = (rarity || "").toLowerCase();
-  const subs = (subtypes || []).map((s) => s.toLowerCase());
+  const subs = (subtypes || [])
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase());
 
+  // Libellés français (TCGdex) et anglais, les arts spéciaux primant sur le suffixe.
   if (r.includes("promo")) return "Promo";
-  if (r.includes("special illustration")) return "Alt Art";
+  if (r.includes("illustration spéciale") || r.includes("special illustration")) {
+    return "Alt Art";
+  }
   if (r.includes("illustration")) return "Rare";
-  if (r.includes("rainbow")) return "Rainbow";
-  if (r.includes("secret") || r.includes("hyper")) return "Gold";
+  if (r.includes("arc-en-ciel") || r.includes("rainbow")) return "Rainbow";
+  if (r.includes("secrète") || r.includes("secret") || r.includes("hyper")) {
+    return "Gold";
+  }
 
   if (subs.includes("vmax")) return "VMAX";
   if (subs.includes("vstar")) return "VSTAR";

@@ -23,6 +23,7 @@ import {
   getLanguage,
 } from "@/lib/categories";
 import { buildFilteredUrl } from "@/lib/cardmarket";
+import ItemDetailModal from "@/components/ItemDetailModal";
 
 const emptyForm = {
   name: "",
@@ -62,6 +63,7 @@ export default function CardsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [editingCard, setEditingCard] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
+  const [detailCard, setDetailCard] = useState(null);
   const [lookupUrl, setLookupUrl] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
@@ -918,7 +920,10 @@ export default function CardsPage() {
                   key={card.id}
                   className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group"
                 >
-                  <div className="relative aspect-3/4 bg-dark-900 overflow-hidden flex items-center justify-center">
+                  <div
+                    onClick={() => setDetailCard(card)}
+                    className="relative aspect-3/4 bg-dark-900 overflow-hidden flex items-center justify-center cursor-pointer"
+                  >
                     {card.quantity > 1 && (
                       <span className="absolute top-1 right-1 z-10 px-1.5 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] font-semibold text-dark-50">
                         ×{card.quantity}
@@ -963,7 +968,10 @@ export default function CardsPage() {
                   </div>
 
                   <div className="p-1.5 space-y-1">
-                    <div className="flex items-center justify-between gap-1">
+                    <div
+                      onClick={() => setDetailCard(card)}
+                      className="flex items-center justify-between gap-1 cursor-pointer"
+                    >
                       <h3 className="font-semibold text-dark-50 text-xs line-clamp-1" title={card.name}>
                         {card.name}
                       </h3>
@@ -1369,6 +1377,12 @@ export default function CardsPage() {
             </div>
           </div>
         )}
+
+        <ItemDetailModal
+          item={detailCard}
+          kind="card"
+          onClose={() => setDetailCard(null)}
+        />
       </div>
     </DashboardLayout>
   );

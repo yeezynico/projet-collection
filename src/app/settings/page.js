@@ -56,7 +56,6 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-red-400 mb-4">Danger Zone</h2>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg font-semibold hover:bg-red-500/30 transition"
