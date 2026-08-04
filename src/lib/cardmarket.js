@@ -69,17 +69,94 @@ export function parseCardmarketUrl(rawUrl) {
   const slug = parts[parts.length - 1];
   const setSlug = parts[parts.length - 2];
 
-  const match = slug.match(/([A-Z]{2,4})(\d+)$/);
+  // Suffixe optionnel identifiant la carte, ex. « -SIT186 » ou « -CRZGG01 ».
+  const match = slug.match(/-([A-Z]{2,}[A-Z0-9]*\d)$/);
+  const suffix = match ? match[1] : null;
+
+  // Sans suffixe, le slug est le seul nom disponible : « Lugia-V » -> « Lugia V ».
+  // On retire aussi les suffixes de variante (« -V1 », « -V3 ») propres à Cardmarket.
+  const cardName = (match ? slug.slice(0, match.index) : slug)
+    .replace(/-V\d+$/, "")
+    .replace(/-/g, " ")
+    .trim();
 
   return {
     isSingle: kind === "Singles",
     kind,
     slug,
+    suffix,
     setName: setSlug.replace(/-/g, " "),
     productName: slug.replace(/-/g, " "),
-    setCode: match ? match[1] : null,
-    number: match ? match[2] : null,
+    cardName,
   };
+}
+
+/**
+ * Sépare un suffixe (« CRZGG01 ») en code d'extension et numéro.
+ * Le découpage est ambigu (« CRZG|G01 » ou « CRZ|GG01 ») : on retient
+ * la première longueur dont le préfixe est un code d'extension connu.
+ */
+export function splitSuffix(suffix, knownCodes) {
+  if (!suffix) return { setCode: null, number: null };
+
+  for (let len = 4; len >= 2; len--) {
+    const code = suffix.slice(0, len);
+    const rest = suffix.slice(len);
+    if (rest && knownCodes?.[code]) {
+      return { setCode: code, number: rest };
+    }
+  }
+
+  // Aucun code connu : on retombe sur un découpage lettres / chiffres.
+  const fallback = suffix.match(/^([A-Z]{2,4})([A-Z]*\d+)$/);
+  return fallback
+    ? { setCode: fallback[1], number: fallback[2] }
+    : { setCode: null, number: null };
+}
+
+/**
+ * Retrouve l'extension d'un produit scellé à partir de son nom.
+ * On teste le préfixe le plus long d'abord : « Mega Evolution Booster Box »
+ * échoue, puis « Mega Evolution Booster », puis « Mega Evolution » qui existe.
+ */
+export function findSetForProduct(productName, nameMap) {
+  if (!productName || !nameMap) return null;
+
+  const words = productName.trim().split(/\s+/);
+  for (let len = words.length; len >= 1; len--) {
+    const key = words.slice(0, len).join(" ").toLowerCase();
+    if (nameMap[key]) return { setName: key, ids: nameMap[key] };
+  }
+
+  return null;
+}
+
+/** Logo officiel d'une extension, servant d'illustration par défaut. */
+export function setLogoUrl(setId) {
+  return setId ? `https://images.pokemontcg.io/${setId}/logo.png` : null;
+}
+
+/**
+ * Traduit la catégorie de produit Cardmarket (segment d'URL) vers nos types de scellés.
+ * Ex. « Booster-Boxes » -> « Display ».
+ */
+export function mapProductKindToType(kind = "") {
+  const k = kind.toLowerCase();
+
+  if (k.includes("elite-trainer")) return "ETB";
+  if (k.includes("booster-box") || k.includes("display")) return "Display";
+  if (k.includes("booster") || k.includes("blister")) return "Booster";
+  if (k.includes("bundle")) return "Bundle";
+  if (
+    k.includes("tin") ||
+    k.includes("box") ||
+    k.includes("collection") ||
+    k.includes("deck")
+  ) {
+    return "Coffret";
+  }
+
+  return "Autre";
 }
 
 /**

@@ -99,6 +99,7 @@ export default function SealedPage() {
       setFormData((prev) => ({
         ...prev,
         name: data.name || prev.name,
+        type: data.type || prev.type,
         imageUrl: data.imageUrl || prev.imageUrl,
         cardmarketUrl: data.cardmarketUrl || lookupUrl.trim(),
         currentPrice:
@@ -363,6 +364,36 @@ export default function SealedPage() {
 
               {lookupError && <p className="text-sm text-red-400">{lookupError}</p>}
               {lookupInfo && <p className="text-sm text-green-400">{lookupInfo}</p>}
+
+              {/* Aperçu du produit récupéré, l'image se met à jour dès qu'une URL est saisie. */}
+              {lookupInfo && formData.name && (
+                <div className="flex items-center gap-4 pt-1">
+                  <div className="w-24 aspect-square rounded-lg overflow-hidden bg-dark-900 shrink-0 p-1">
+                    {formData.imageUrl ? (
+                      <img
+                        src={getImageSrc(formData.imageUrl)}
+                        alt={formData.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-dark-600">
+                        <ImageOff size={24} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-dark-50">{formData.name}</p>
+                    {formData.type && (
+                      <p className="text-sm text-brand-secondary">{formData.type}</p>
+                    )}
+                    <p className="text-xs text-dark-500 mt-0.5">
+                      {formData.imageUrl
+                        ? "Image chargée"
+                        : "Ajoutez une URL d'image ci-dessous pour l'aperçu"}
+                    </p>
+                  </div>
+                </div>
+              )}
               <p className="text-xs text-dark-500">
                 Les produits scellés ne sont pas référencés par la base de cartes : seuls le
                 nom et le lien sont déduits, à compléter manuellement.
@@ -710,7 +741,7 @@ export default function SealedPage() {
                       <img
                         src={getImageSrc(item.imageUrl)}
                         alt={item.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                        className="w-full h-full object-contain p-1 group-hover:scale-105 transition"
                         onError={(e) => {
                           e.target.style.display = "none";
                           e.target.nextSibling.style.display = "flex";
@@ -792,7 +823,7 @@ export default function SealedPage() {
                     <img
                       src={getImageSrc(sellingItem.imageUrl)}
                       alt={sellingItem.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain p-1"
                     />
                   ) : (
                     <ImageOff size={24} className="text-dark-600" />
@@ -876,7 +907,7 @@ export default function SealedPage() {
                     <img
                       src={getImageSrc(editData.imageUrl)}
                       alt={editData.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain p-1"
                     />
                   ) : (
                     <ImageOff size={24} className="text-dark-600" />

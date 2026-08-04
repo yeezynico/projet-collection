@@ -66,6 +66,7 @@ export default function CardsPage() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   const [lookupInfo, setLookupInfo] = useState("");
+  const [lookupCandidates, setLookupCandidates] = useState([]);
 
   function toggleIn(setter) {
     return (value) =>
@@ -81,6 +82,29 @@ export default function CardsPage() {
   const activeFilterCount =
     selectedCategories.length + selectedLanguages.length + selectedConditions.length;
 
+  /** Recopie une version de carte dans le formulaire. */
+  function applyCandidate(c) {
+    setFormData((prev) => ({
+      ...prev,
+      name: c.name || prev.name,
+      extension: c.extension || prev.extension,
+      number: c.number || prev.number,
+      category: c.category || prev.category,
+      imageUrl: c.imageUrl || prev.imageUrl,
+      cardmarketUrl: c.cardmarketUrl || lookupUrl.trim(),
+      currentPrice:
+        c.suggestedPrice != null ? c.suggestedPrice.toFixed(2) : prev.currentPrice,
+      priceSource: c.priceSource || "",
+      priceUpdatedAt: c.priceUpdatedAt || "",
+    }));
+
+    setLookupInfo(
+      c.suggestedPrice != null
+        ? `${c.name} n°${c.number} — prix indicatif ${c.suggestedPrice.toFixed(2)} € (${c.priceSource}, maj ${c.priceUpdatedAt}). Moyenne européenne toutes langues : vérifiez sur Cardmarket.`
+        : `${c.name} n°${c.number} récupérée. Aucun prix de référence, saisissez-le manuellement.`
+    );
+  }
+
   /** Remplit le formulaire à partir d'un lien Cardmarket. */
   async function handleLookup() {
     if (!lookupUrl.trim()) return;
@@ -88,6 +112,7 @@ export default function CardsPage() {
     setLookupLoading(true);
     setLookupError("");
     setLookupInfo("");
+    setLookupCandidates([]);
 
     try {
       const res = await fetch(`/api/lookup?url=${encodeURIComponent(lookupUrl.trim())}`);
@@ -98,27 +123,13 @@ export default function CardsPage() {
         return;
       }
 
-      setFormData((prev) => ({
-        ...prev,
-        name: data.name || prev.name,
-        extension: data.extension || prev.extension,
-        number: data.number || prev.number,
-        category: data.category || prev.category,
-        imageUrl: data.imageUrl || prev.imageUrl,
-        cardmarketUrl: data.cardmarketUrl || lookupUrl.trim(),
-        currentPrice:
-          data.suggestedPrice != null ? data.suggestedPrice.toFixed(2) : prev.currentPrice,
-        priceSource: data.priceSource || "",
-        priceUpdatedAt: data.priceUpdatedAt || "",
-      }));
+      applyCandidate(data);
+      setLookupCandidates(data.candidates || []);
 
-      if (data.suggestedPrice != null) {
+      // Le lien ne désigne pas une version précise : on propose le choix.
+      if (data.multiple) {
         setLookupInfo(
-          `${data.name} récupérée. Prix indicatif ${data.suggestedPrice.toFixed(2)} € — ${data.priceSource}, mis à jour le ${data.priceUpdatedAt}. Moyenne européenne toutes langues : vérifiez sur Cardmarket.`
-        );
-      } else {
-        setLookupInfo(
-          `${data.name || "Produit"} récupéré. Aucun prix de référence disponible, saisissez-le manuellement.`
+          `${data.candidates.length} versions trouvées pour « ${data.name} ». Sélectionnez la vôtre ci-dessous.`
         );
       }
     } catch {
@@ -179,6 +190,7 @@ export default function CardsPage() {
         setLookupUrl("");
         setLookupInfo("");
         setLookupError("");
+        setLookupCandidates([]);
         setShowForm(false);
       }
     } catch (error) {
@@ -397,6 +409,85 @@ export default function CardsPage() {
               )}
               {lookupInfo && (
                 <p className="text-sm text-green-400">{lookupInfo}</p>
+              )}
+
+              {/* Un seul résultat : aperçu détaillé de la carte récupérée. */}
+              {lookupCandidates.length === 1 && (
+                <div className="flex items-center gap-4 pt-1">
+                  <div className="w-24 aspect-3/4 rounded-lg overflow-hidden bg-dark-900 shrink-0">
+                    {lookupCandidates[0].imageUrl ? (
+                      <img
+                        src={lookupCandidates[0].imageUrl}
+                        alt={lookupCandidates[0].name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-dark-600">
+                        <ImageOff size={24} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-dark-50">
+                      {lookupCandidates[0].name}
+                    </p>
+                    <p className="text-sm text-dark-400">
+                      {lookupCandidates[0].extension} · n°{lookupCandidates[0].number}
+                    </p>
+                    <p className="text-xs text-dark-500 mt-0.5">
+                      {lookupCandidates[0].rarity || "Rareté inconnue"}
+                    </p>
+                    {lookupCandidates[0].suggestedPrice != null && (
+                      <p className="text-sm text-brand-primary font-semibold mt-1">
+                        {lookupCandidates[0].suggestedPrice.toFixed(2)} €
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Plusieurs versions : grille de sélection. */}
+              {lookupCandidates.length > 1 && (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-1">
+                  {lookupCandidates.map((c) => {
+                    const selected = formData.number === c.number;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyCandidate(c)}
+                        className={`rounded-lg overflow-hidden border-2 transition text-left ${
+                          selected
+                            ? "border-brand-primary"
+                            : "border-transparent hover:border-dark-500"
+                        }`}
+                      >
+                        <div className="aspect-3/4 bg-dark-900">
+                          {c.imageUrl && (
+                            <img
+                              src={c.imageUrl}
+                              alt={c.name}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="px-1 py-1 bg-dark-900/80">
+                          <p className="text-[10px] font-semibold text-dark-100">
+                            n°{c.number}
+                          </p>
+                          <p className="text-[9px] text-dark-400 line-clamp-1">
+                            {c.rarity || "—"}
+                          </p>
+                          {c.suggestedPrice != null && (
+                            <p className="text-[10px] text-brand-primary font-medium">
+                              {c.suggestedPrice.toFixed(2)} €
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               )}
               <p className="text-xs text-dark-500">
                 Récupère nom, extension, numéro, rareté et photo. Le prix proposé est une
