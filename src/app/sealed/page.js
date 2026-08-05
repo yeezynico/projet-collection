@@ -27,6 +27,7 @@ import ItemDetailModal from "@/components/ItemDetailModal";
 import CardmarketPriceModal from "@/components/CardmarketPriceModal";
 
 const emptyForm = {
+  externalId: "",
   name: "",
   type: "",
   language: "FR",
@@ -102,6 +103,7 @@ export default function SealedPage() {
 
       setFormData((prev) => ({
         ...prev,
+        externalId: data.externalId || prev.externalId,
         name: data.name || prev.name,
         type: data.type || prev.type,
         imageUrl: data.imageUrl || prev.imageUrl,
@@ -194,6 +196,8 @@ export default function SealedPage() {
   function openEditModal(item) {
     setEditingItem(item);
     setEditData({
+      // Identifiant de la carte dans la base de référence, conservé tel quel.
+      externalId: item.externalId ?? "",
       name: item.name ?? "",
       type: item.type ?? "",
       language: item.language ?? "",

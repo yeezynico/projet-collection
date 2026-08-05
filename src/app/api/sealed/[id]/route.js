@@ -43,9 +43,10 @@ export async function PUT(req, { params }) {
 
     const data = await req.json();
 
-    const updated = await prisma.sealedProduct.update({
+        const updated = await prisma.sealedProduct.update({
       where: { id },
       data: {
+        externalId: data.externalId || null,
         name: data.name,
         type: data.type,
         language: data.language || null,

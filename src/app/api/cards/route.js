@@ -48,9 +48,10 @@ export async function POST(req) {
 
     const data = await req.json();
 
-    const card = await prisma.card.create({
+        const card = await prisma.card.create({
       data: {
         userId: session.user.id,
+        externalId: data.externalId || null,
         name: data.name,
         extension: data.extension,
         number: data.number || null,

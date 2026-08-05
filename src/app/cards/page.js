@@ -27,6 +27,7 @@ import ItemDetailModal from "@/components/ItemDetailModal";
 import CardmarketPriceModal from "@/components/CardmarketPriceModal";
 
 const emptyForm = {
+  externalId: "",
   name: "",
   extension: "",
   number: "",
@@ -90,6 +91,7 @@ export default function CardsPage() {
   function applyCandidate(c) {
     setFormData((prev) => ({
       ...prev,
+      externalId: c.externalId || prev.externalId,
       name: c.name || prev.name,
       extension: c.extension || prev.extension,
       number: c.number || prev.number,
@@ -220,6 +222,8 @@ export default function CardsPage() {
   function openEditModal(card) {
     setEditingCard(card);
     setEditData({
+      // Identifiant de la carte dans la base de référence, conservé tel quel.
+      externalId: card.externalId ?? "",
       name: card.name ?? "",
       extension: card.extension ?? "",
       number: card.number ?? "",

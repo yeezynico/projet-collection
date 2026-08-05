@@ -9,6 +9,38 @@ import {
   getLanguage,
   getCondition,
 } from "@/lib/categories";
+import {
+  buildSearchQuery,
+  ebaySoldUrl,
+  vintedUrl,
+} from "@/lib/marketplaces";
+
+/** Lien vers une place de marché, présenté de façon homogène. */
+function MarketLink({ href, badge, badgeClass, title, subtitle }) {
+  if (!href) return null;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex items-center gap-3 w-full p-2.5 bg-dark-900/70 border border-dark-700 rounded-xl hover:border-brand-primary/50 hover:bg-dark-900 transition"
+    >
+      <span
+        className={`flex items-center justify-center w-9 h-9 rounded-lg font-bold text-[11px] shrink-0 ${badgeClass}`}
+      >
+        {badge}
+      </span>
+      <span className="flex-1 min-w-0 text-left">
+        <span className="block text-sm font-semibold text-dark-50">{title}</span>
+        <span className="block text-[11px] text-dark-500">{subtitle}</span>
+      </span>
+      <ArrowUpRight
+        size={18}
+        className="text-dark-500 group-hover:text-brand-primary transition shrink-0"
+      />
+    </a>
+  );
+}
 
 /** Petite pastille libellé / valeur, réutilisée pour toutes les caractéristiques. */
 function Chip({ label, children }) {
@@ -65,6 +97,10 @@ export default function ItemDetailModal({ item, kind = "card", onClose }) {
         minCondition: null,
       })
     : null;
+
+  // Recherche sur les places de marché : « Lugia V 186 » plutôt que « Lugia V »,
+  // le numéro distinguant l'illustration alternative des autres versions.
+  const query = buildSearchQuery(item, kind);
 
   const purchaseDate = item.purchaseDate
     ? new Date(item.purchaseDate).toLocaleDateString("fr-FR", {
@@ -232,31 +268,33 @@ export default function ItemDetailModal({ item, kind = "card", onClose }) {
               </p>
             )}
 
-            {cmUrl && (
-              <a
+            <div className="space-y-2">
+              <MarketLink
                 href={cmUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="group flex items-center gap-3 w-full p-3 bg-dark-900/70 border border-dark-700 rounded-xl hover:border-brand-primary/50 hover:bg-dark-900 transition"
-              >
-                <span className="flex items-center justify-center w-9 h-9 rounded-lg bg-[#012169] text-white font-bold text-xs shrink-0">
-                  CM
-                </span>
-                <span className="flex-1 min-w-0 text-left">
-                  <span className="block text-sm font-semibold text-dark-50">
-                    Voir sur Cardmarket
-                  </span>
-                  <span className="block text-[11px] text-dark-500">
-                    Vendeurs FR
-                    {language && ` · ${language.label.toLowerCase()}`}
-                  </span>
-                </span>
-                <ArrowUpRight
-                  size={18}
-                  className="text-dark-500 group-hover:text-brand-primary transition shrink-0"
-                />
-              </a>
-            )}
+                badge="CM"
+                badgeClass="bg-[#012169] text-white"
+                title="Voir sur Cardmarket"
+                subtitle={`Vendeurs FR${
+                  language ? ` · ${language.label.toLowerCase()}` : ""
+                }`}
+              />
+
+              <MarketLink
+                href={ebaySoldUrl(query)}
+                badge="eBay"
+                badgeClass="bg-white text-[#e53238]"
+                title="Ventes conclues sur eBay"
+                subtitle={`« ${query} » · prix réellement payés`}
+              />
+
+              <MarketLink
+                href={vintedUrl(query)}
+                badge="V"
+                badgeClass="bg-[#09b1ba] text-white text-base"
+                title="Rechercher sur Vinted"
+                subtitle={`« ${query} » · annonces en cours`}
+              />
+            </div>
           </div>
         </div>
       </div>

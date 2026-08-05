@@ -45,9 +45,10 @@ export async function POST(req) {
 
     const data = await req.json();
 
-    const sealed = await prisma.sealedProduct.create({
+        const sealed = await prisma.sealedProduct.create({
       data: {
         userId: session.user.id,
+        externalId: data.externalId || null,
         name: data.name,
         type: data.type,
         language: data.language || null,

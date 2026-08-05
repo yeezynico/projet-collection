@@ -215,6 +215,12 @@ export default function CardmarketPriceModal({
                   <p className="text-2xl font-bold text-amber-300 mt-0.5">
                     {avg.toFixed(2)} €
                   </p>
+                  {/* Détail du calcul : cocher une annonce plus chère que la
+                      moyenne la fait monter, ce qui surprend sans explication. */}
+                  <p className="text-[11px] text-amber-200/50 mt-1 wrap-break-word">
+                    ({kept.map((l) => l.value.toFixed(2)).join(" + ")}) ÷{" "}
+                    {kept.length}
+                  </p>
                 </div>
               )}
 

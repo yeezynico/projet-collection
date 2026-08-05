@@ -43,9 +43,10 @@ export async function PUT(req, { params }) {
 
     const data = await req.json();
 
-    const updated = await prisma.card.update({
+        const updated = await prisma.card.update({
       where: { id },
       data: {
+        externalId: data.externalId || null,
         name: data.name,
         extension: data.extension,
         number: data.number || null,

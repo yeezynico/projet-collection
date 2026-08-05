@@ -142,6 +142,7 @@ export async function findSealedProduct(productName) {
     name: best.name,
     imageUrl: highResImage(best.imageUrl),
     productId: best.productId,
+    groupId: group.groupId,
     groupName: cleanGroupName(group.name),
     priceUsd,
     score: bestScore,

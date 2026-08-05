@@ -86,6 +86,10 @@ model Card {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Identifiant TCGdex (ex. « sv10-230 ») retenu lors de la recherche
+  // automatique, pour retrouver la carte dans la base de référence.
+  externalId String?
+
   name String
 
   extension String?
@@ -108,6 +112,7 @@ model Card {
 
   priceUpdatedAt DateTime?
 
+
   imageUrl String?
 
   cardmarketUrl String?
@@ -122,6 +127,9 @@ model SealedProduct {
 
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Identifiant produit TCGplayer, même usage que pour les cartes.
+  externalId String?
 
   name String
 
@@ -140,6 +148,7 @@ model SealedProduct {
   priceSource String?
 
   priceUpdatedAt DateTime?
+
 
   imageUrl String?
 
@@ -182,3 +191,4 @@ model Sale {
 
   createdAt DateTime @default(now())
 }
+

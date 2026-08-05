@@ -65,6 +65,8 @@ function serializeCard(card, rawUrl) {
   const price = pickPrice(card.pricing);
   return {
     id: card.id,
+    // Identifiant reutilisable pour actualiser le prix plus tard.
+    externalId: card.id,
     name: card.name,
     extension: card.set?.name || null,
     number: card.localId,
@@ -180,6 +182,10 @@ export async function GET(req) {
       return NextResponse.json({
         kind: "sealed",
         name: product?.name || parsed.productName,
+        externalId:
+          product?.groupId && product?.productId
+            ? `${product.groupId}:${product.productId}`
+            : null,
         type,
         imageUrl: product?.imageUrl || null,
         cardmarketUrl: parsed.href,
