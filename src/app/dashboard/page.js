@@ -31,17 +31,23 @@ function Delta({ value, percentage, className = "", iconSize = 15, percentClass 
   const neutral = value === 0;
   const Icon = positive ? TrendingUp : TrendingDown;
 
+  // Montant et pourcentage sont chacun insécables : sur mobile, la coupure
+  // se fait entre les deux plutôt qu'au milieu d'un nombre.
   return (
     <span
-      className={`inline-flex items-center gap-1.5 font-bold ${
+      className={`inline-flex flex-wrap items-baseline gap-x-1.5 font-bold ${
         neutral ? "text-dark-400" : positive ? "text-green-400" : "text-red-400"
       } ${className}`}
     >
-      {!neutral && <Icon size={iconSize} />}
-      {positive ? "+" : ""}
-      {eur(value)}
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+        {!neutral && <Icon size={iconSize} className="shrink-0" />}
+        {positive ? "+" : ""}
+        {eur(value)}
+      </span>
       {percentage != null && (
-        <span className={`opacity-70 font-semibold ${percentClass}`}>
+        <span
+          className={`opacity-70 font-semibold whitespace-nowrap ${percentClass}`}
+        >
           ({positive ? "+" : ""}
           {percentage.toFixed(1)} %)
         </span>
@@ -111,7 +117,9 @@ function SegmentCard({ href, icon: Icon, label, count, stats, accent, sealed }) 
       </div>
 
       <div className="relative z-10 min-w-0 pr-40">
-        <p className="text-2xl font-bold text-dark-50">{eur(stats.value)}</p>
+        <p className="text-2xl font-bold text-dark-50 whitespace-nowrap">
+          {eur(stats.value)}
+        </p>
         <p className="text-sm text-dark-300 mt-0.5">
           {eur(stats.invested)} investis
         </p>
@@ -168,21 +176,21 @@ export default async function DashboardPage() {
 
           {/* Mêmes tailles que les cartes de catégorie, pour que l'œil
               compare les montants sans changer d'échelle. */}
-          <div className="grid grid-cols-2 gap-3 mt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div className="surface rounded-2xl px-4 py-3">
               <p className="text-sm text-dark-300 mb-1">Gain potentiel</p>
               <Delta
                 value={stats.potentialGain}
                 percentage={stats.potentialPercentage}
-                className="text-2xl"
+                className="text-xl sm:text-2xl"
                 iconSize={20}
-                percentClass="text-base"
+                percentClass="text-sm sm:text-base"
               />
             </div>
             <div className="surface rounded-2xl px-4 py-3">
               <p className="text-sm text-dark-300 mb-1">Total investi</p>
-              <p className="text-2xl font-bold text-dark-50 flex items-center gap-1.5">
-                <ShoppingCart size={20} className="text-dark-400" />
+              <p className="text-xl sm:text-2xl font-bold text-dark-50 flex items-center gap-1.5 whitespace-nowrap">
+                <ShoppingCart size={20} className="text-dark-400 shrink-0" />
                 {eur(stats.totalInvested)}
               </p>
             </div>
@@ -241,7 +249,7 @@ export default async function DashboardPage() {
                 />
               </div>
 
-              <p className="text-2xl font-bold text-dark-50">
+              <p className="text-2xl font-bold text-dark-50 whitespace-nowrap">
                 {eur(stats.totalSold)}
               </p>
               <p className="text-sm text-dark-300 mt-0.5">encaissés</p>
