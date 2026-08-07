@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
 import { useSession } from "next-auth/react";
-import { Camera, ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus } from "lucide-react";
+import { ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus, Link2, Loader2 } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
 import { CARD_CATEGORIES, SEALED_TYPES } from "@/lib/categories";
 
@@ -71,6 +71,152 @@ function formatPeriodLabel(type, range) {
   return "Tout";
 }
 
+
+const MONTHS = [
+  "janv.", "févr.", "mars", "avr.", "mai", "juin",
+  "juil.", "août", "sept.", "oct.", "nov.", "déc.",
+];
+
+/** Décalage en mois entre une date et le mois courant. */
+function monthOffset(year, month) {
+  const now = new Date();
+  return (year - now.getFullYear()) * 12 + (month - now.getMonth());
+}
+
+/** Décalage en semaines entre une date et la semaine courante. */
+function weekOffset(date) {
+  const now = new Date();
+  const monday = (d) => {
+    const c = new Date(d);
+    c.setHours(0, 0, 0, 0);
+    c.setDate(c.getDate() + ((c.getDay() === 0 ? -6 : 1) - c.getDay()));
+    return c;
+  };
+  return Math.round((monday(date) - monday(now)) / (7 * 86400000));
+}
+
+
+/**
+ * Sélecteur de période : grille de mois, liste d'années, ou semaines
+ * récentes selon le mode actif. Les périodes futures sont désactivées.
+ */
+function PeriodPicker({ type, range, onSelect }) {
+  const now = new Date();
+  const current = range?.start ?? now;
+
+  if (type === "year") {
+    const years = [];
+    for (let y = now.getFullYear(); y > now.getFullYear() - 8; y--) years.push(y);
+
+    return (
+      <div className="grid grid-cols-3 gap-1.5">
+        {years.map((y) => (
+          <button
+            key={y}
+            onClick={() => onSelect(y - now.getFullYear())}
+            className={`py-2 rounded-lg text-sm font-medium transition ${
+              y === current.getFullYear()
+                ? "pill-active"
+                : "text-dark-300 hover:bg-white/5"
+            }`}
+          >
+            {y}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (type === "week") {
+    const weeks = [];
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i * 7);
+      weeks.push(d);
+    }
+
+    return (
+      <div className="max-h-64 overflow-y-auto space-y-1">
+        {weeks.map((d, i) => {
+          const monday = new Date(d);
+          monday.setDate(d.getDate() + ((d.getDay() === 0 ? -6 : 1) - d.getDay()));
+          const sunday = new Date(monday);
+          sunday.setDate(monday.getDate() + 6);
+          const opts = { day: "numeric", month: "short" };
+
+          return (
+            <button
+              key={i}
+              onClick={() => onSelect(weekOffset(d))}
+              className={`w-full py-2 px-3 rounded-lg text-sm text-left transition ${
+                i === 0 && !range
+                  ? "text-dark-300 hover:bg-white/5"
+                  : monday.toDateString() === current.toDateString()
+                    ? "pill-active font-medium"
+                    : "text-dark-300 hover:bg-white/5"
+              }`}
+            >
+              {monday.toLocaleDateString("fr-FR", opts)} –{" "}
+              {sunday.toLocaleDateString("fr-FR", opts)}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Mois : navigation par année puis grille des douze mois
+  const year = current.getFullYear();
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => onSelect(monthOffset(year - 1, current.getMonth()))}
+          className="p-1 rounded-md text-dark-400 hover:text-dark-50 hover:bg-white/5 transition"
+          aria-label="Année précédente"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-semibold text-dark-100">{year}</span>
+        <button
+          onClick={() => onSelect(monthOffset(year + 1, current.getMonth()))}
+          disabled={year >= now.getFullYear()}
+          className="p-1 rounded-md text-dark-400 hover:text-dark-50 hover:bg-white/5 transition disabled:opacity-25 disabled:cursor-not-allowed"
+          aria-label="Année suivante"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-3 gap-1.5">
+        {MONTHS.map((label, m) => {
+          const offset = monthOffset(year, m);
+          const future = offset > 0;
+          const active = year === current.getFullYear() && m === current.getMonth();
+
+          return (
+            <button
+              key={m}
+              onClick={() => onSelect(offset)}
+              disabled={future}
+              className={`py-2 rounded-lg text-sm font-medium transition ${
+                active
+                  ? "pill-active"
+                  : future
+                    ? "text-dark-600 cursor-not-allowed"
+                    : "text-dark-300 hover:bg-white/5"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function SalesPage() {
   const { data: session } = useSession();
   const [sales, setSales] = useState([]);
@@ -82,7 +228,13 @@ export default function SalesPage() {
   const [preview, setPreview] = useState(null);
   const [periodType, setPeriodType] = useState("all");
   const [periodOffset, setPeriodOffset] = useState(0);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [lookupUrl, setLookupUrl] = useState("");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [lookupInfo, setLookupInfo] = useState("");
+  const [lookupCandidates, setLookupCandidates] = useState([]);
   const [addData, setAddData] = useState({
     itemName: "",
     itemType: "card",
@@ -125,6 +277,7 @@ export default function SalesPage() {
     setPreview({
       url: sale.imageUrl,
       name: sale.itemName,
+      sealed: sale.itemType === "sealed",
       top: Math.min(Math.max(rect.top + rect.height / 2, 120), window.innerHeight - 120),
       left,
     });
@@ -161,6 +314,72 @@ export default function SalesPage() {
     );
   }
 
+  /**
+   * Recopie un résultat de recherche dans le formulaire.
+   * Le type est déduit du lien : `/Singles/` donne une carte, le reste un scellé.
+   */
+  function applyLookup(data) {
+    setAddData((prev) => ({
+      ...prev,
+      itemName: data.name || prev.itemName,
+      itemType: data.kind === "sealed" ? "sealed" : "card",
+      itemCategory: data.category || data.type || prev.itemCategory,
+      imageUrl: data.imageUrl || prev.imageUrl,
+    }));
+  }
+
+  /** Remplit le formulaire de vente depuis un lien Cardmarket. */
+  async function handleLookup() {
+    if (!lookupUrl.trim()) return;
+
+    setLookupLoading(true);
+    setLookupError("");
+    setLookupInfo("");
+    setLookupCandidates([]);
+
+    try {
+      const res = await fetch(
+        `/api/lookup?url=${encodeURIComponent(lookupUrl.trim())}`
+      );
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLookupError(data.error || "Récupération impossible");
+        return;
+      }
+
+      applyLookup(data);
+      setLookupCandidates(data.candidates || []);
+
+      setLookupInfo(
+        data.multiple
+          ? `${data.candidates.length} versions trouvées pour « ${data.name} ». Sélectionnez la vôtre.`
+          : `${data.name} récupéré${data.kind === "sealed" ? "" : "e"}. Complétez les prix.`
+      );
+    } catch {
+      setLookupError("Erreur réseau lors de la récupération");
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
+  function resetAddForm() {
+    setAddData({
+      itemName: "",
+      itemType: "card",
+      itemCategory: "",
+      quantity: "1",
+      purchasePrice: "",
+      salePrice: "",
+      saleDate: new Date().toISOString().split("T")[0],
+      imageUrl: "",
+    });
+    setLookupUrl("");
+    setLookupInfo("");
+    setLookupError("");
+    setLookupCandidates([]);
+  }
+
   /** Enregistre une vente sans article lié : utile pour une vente oubliée. */
   async function handleAddSale(e) {
     e.preventDefault();
@@ -180,16 +399,7 @@ export default function SalesPage() {
       if (res.ok) {
         const created = await res.json();
         setSales((prev) => [created, ...prev]);
-        setAddData({
-          itemName: "",
-          itemType: "card",
-          itemCategory: "",
-          quantity: "1",
-          purchasePrice: "",
-          salePrice: "",
-          saleDate: new Date().toISOString().split("T")[0],
-          imageUrl: "",
-        });
+        resetAddForm();
         setShowAddForm(false);
       }
     } catch (error) {
@@ -290,7 +500,7 @@ export default function SalesPage() {
           </div>
           <button
             onClick={() => setShowAddForm(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+            className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
           >
             <Plus size={20} />
             Ajouter une vente
@@ -306,7 +516,7 @@ export default function SalesPage() {
                 onClick={() => changePeriodType(p.value)}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition ${
                   periodType === p.value
-                    ? "bg-brand-primary text-white shadow"
+                    ? "btn-gold shadow"
                     : "text-dark-300 hover:text-dark-50"
                 }`}
               >
@@ -324,9 +534,35 @@ export default function SalesPage() {
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-sm font-semibold text-dark-50 min-w-36 text-center">
-                {periodLabel}
-              </span>
+              {/* Le libellé ouvre un sélecteur, pour atteindre une période
+                  lointaine sans multiplier les clics sur les flèches. */}
+              <div className="relative">
+                <button
+                  onClick={() => setPickerOpen((o) => !o)}
+                  className="text-sm font-semibold text-dark-50 min-w-36 text-center px-2 py-1 rounded-lg hover:bg-white/5 transition"
+                >
+                  {periodLabel}
+                </button>
+
+                {pickerOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setPickerOpen(false)}
+                    />
+                    <div className="absolute z-40 top-full mt-2 left-1/2 -translate-x-1/2 w-64 surface bg-dark-900 rounded-2xl p-3 shadow-2xl">
+                      <PeriodPicker
+                        type={periodType}
+                        range={periodRange}
+                        onSelect={(offset) => {
+                          setPeriodOffset(offset);
+                          setPickerOpen(false);
+                        }}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => setPeriodOffset((o) => Math.min(o + 1, 0))}
                 disabled={periodOffset >= 0}
@@ -376,7 +612,7 @@ export default function SalesPage() {
         </div>
 
         {showFilters && (
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-4">
+          <div className="surface rounded-2xl p-4 space-y-4">
             <div>
               <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
                 Type
@@ -459,19 +695,19 @@ export default function SalesPage() {
 
         {filteredSales.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
+            <div className="surface rounded-xl p-4">
               <p className="text-dark-400 text-sm">Total investi</p>
               <p className="text-2xl font-bold text-dark-50">€{totalInvested.toFixed(2)}</p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
+            <div className="surface rounded-xl p-4">
               <p className="text-dark-400 text-sm">Total vendu</p>
               <p className="text-2xl font-bold text-dark-50">€{totalSold.toFixed(2)}</p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
+            <div className="surface rounded-xl p-4">
               <p className="text-dark-400 text-sm">Gain total</p>
               <p className={`text-2xl font-bold ${totalGain >= 0 ? "text-green-400" : "text-red-400"}`}>€{totalGain.toFixed(2)}</p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
+            <div className="surface rounded-xl p-4">
               <p className="text-dark-400 text-sm">Pourcentage global</p>
               <p className={`text-2xl font-bold ${totalPercentage == null ? "text-dark-500" : totalPercentage >= 0 ? "text-green-400" : "text-red-400"}`}>
                 {totalPercentage == null ? "—" : `${totalPercentage.toFixed(1)}%`}
@@ -483,13 +719,13 @@ export default function SalesPage() {
         {loading ? (
           <p className="text-center py-12 text-dark-400">Chargement...</p>
         ) : filteredSales.length === 0 ? (
-          <div className="text-center py-12 bg-dark-800/50 rounded-xl">
+          <div className="text-center py-12 surface rounded-2xl">
             <p className="text-dark-400">
               {sales.length === 0 ? "Aucune vente pour le moment" : "Aucune vente ne correspond aux filtres"}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto bg-dark-800/50 border border-dark-700 rounded-xl">
+          <div className="overflow-x-auto surface rounded-2xl">
             <table className="w-full text-sm">
               <thead className="bg-dark-900/50 border-b border-dark-700">
                 <tr>
@@ -508,17 +744,31 @@ export default function SalesPage() {
                 {filteredSales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-dark-700/50 transition">
                     <td className="px-4 py-2 text-dark-50">
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
+                      <div className="flex items-center gap-2.5">
+                        {/* Miniature de l'article : on reconnaît d'un coup d'œil
+                            ce qui a été vendu, le survol l'agrandit. */}
+                        <div
                           onMouseEnter={(e) => showPreview(e, sale)}
                           onMouseLeave={hidePreview}
-                          className="p-1 rounded text-dark-500 hover:text-brand-primary transition shrink-0"
-                          tabIndex={-1}
+                          className="w-9 h-12 rounded-md overflow-hidden bg-dark-950 ring-1 ring-white/8 shrink-0 hover:ring-brand-primary/50 transition"
                         >
-                          {sale.imageUrl ? <Camera size={14} /> : <ImageOff size={14} />}
-                        </button>
-                        <span className="line-clamp-1">{sale.itemName}</span>
+                          {sale.imageUrl ? (
+                            <img
+                              src={getImageSrc(sale.imageUrl)}
+                              alt=""
+                              className={`w-full h-full ${
+                                sale.itemType === "sealed"
+                                  ? "object-contain p-0.5"
+                                  : "object-cover"
+                              }`}
+                            />
+                          ) : (
+                            <span className="flex items-center justify-center w-full h-full text-dark-600">
+                              <ImageOff size={14} />
+                            </span>
+                          )}
+                        </div>
+                        <span className="line-clamp-2">{sale.itemName}</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-dark-400">
@@ -566,11 +816,15 @@ export default function SalesPage() {
             className="fixed z-100 pointer-events-none -translate-y-1/2"
             style={{ top: preview.top, left: preview.left }}
           >
-            <div className="w-40 aspect-3/4 rounded-xl overflow-hidden shadow-2xl bg-dark-900">
+            <div
+              className={`w-44 ${
+                preview.sealed ? "aspect-square p-2" : "aspect-3/4"
+              } rounded-2xl overflow-hidden shadow-2xl bg-dark-900 ring-1 ring-white/10`}
+            >
               <img
                 src={getImageSrc(preview.url)}
                 alt={preview.name}
-                className="w-full h-full object-cover"
+                className={`w-full h-full ${preview.sealed ? "object-contain" : "object-cover"}`}
               />
             </div>
           </div>
@@ -588,6 +842,78 @@ export default function SalesPage() {
                   Pour une vente réalisée sans que l'article soit dans votre
                   collection. Rien ne sera retiré des cartes ou scellés.
                 </p>
+              </div>
+
+              {/* Remplissage automatique : le même champ accepte une carte
+                  comme un produit scellé, le type étant déduit du lien. */}
+              <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3 mb-4">
+                <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                  <Link2 size={16} className="text-brand-primary" />
+                  Remplissage automatique depuis Cardmarket
+                </label>
+
+                <div className="flex gap-2 flex-wrap">
+                  <input
+                    type="url"
+                    value={lookupUrl}
+                    onChange={(e) => setLookupUrl(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleLookup();
+                      }
+                    }}
+                    placeholder="Lien d'une carte ou d'un produit scellé"
+                    className="flex-1 min-w-56 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLookup}
+                    disabled={lookupLoading || !lookupUrl.trim()}
+                    className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm  transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {lookupLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Recherche...
+                      </>
+                    ) : (
+                      "Récupérer"
+                    )}
+                  </button>
+                </div>
+
+                {lookupError && <p className="text-sm text-red-400">{lookupError}</p>}
+                {lookupInfo && <p className="text-sm text-green-400">{lookupInfo}</p>}
+
+                {lookupCandidates.length > 1 && (
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                    {lookupCandidates.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => applyLookup(c)}
+                        className={`rounded-lg overflow-hidden border-2 transition ${
+                          addData.itemName === c.name && addData.imageUrl === c.imageUrl
+                            ? "border-brand-primary"
+                            : "border-transparent hover:border-dark-500"
+                        }`}
+                      >
+                        <div className="aspect-3/4 bg-dark-900">
+                          {c.imageUrl && (
+                            <img
+                              src={c.imageUrl}
+                              alt={c.name}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <p className="text-[10px] text-dark-300 py-0.5 bg-dark-900/80">
+                          n°{c.number}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <form onSubmit={handleAddSale} className="space-y-4">
@@ -726,7 +1052,10 @@ export default function SalesPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setShowAddForm(false)}
+                    onClick={() => {
+                      resetAddForm();
+                      setShowAddForm(false);
+                    }}
                     className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
                   >
                     Annuler
@@ -823,7 +1152,7 @@ export default function SalesPage() {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                    className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
                   >
                     Enregistrer
                   </button>

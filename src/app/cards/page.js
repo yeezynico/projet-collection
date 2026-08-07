@@ -19,7 +19,6 @@ import {
   CARD_CATEGORIES,
   LANGUAGES,
   CONDITIONS,
-  CONDITION_STYLES,
   getLanguage,
 } from "@/lib/categories";
 import { buildFilteredUrl } from "@/lib/cardmarket";
@@ -358,7 +357,7 @@ export default function CardsPage() {
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+            className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
           >
             <Plus size={20} />
             Ajouter une carte
@@ -369,7 +368,7 @@ export default function CardsPage() {
         {showForm && (
           <form
             onSubmit={handleSubmit}
-            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-6 space-y-4"
+            className="surface rounded-2xl p-6 space-y-4"
           >
             <h2 className="text-xl font-semibold text-dark-50 mb-4">
               Ajouter une nouvelle carte
@@ -400,7 +399,7 @@ export default function CardsPage() {
                   type="button"
                   onClick={handleLookup}
                   disabled={lookupLoading || !lookupUrl.trim()}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold text-sm hover:bg-brand-primary/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm  transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {lookupLoading ? (
                     <>
@@ -729,7 +728,7 @@ export default function CardsPage() {
             <div className="flex gap-2 pt-4">
               <button
                 type="submit"
-                className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition"
+                className="px-4 py-2 btn-gold rounded-lg font-semibold  transition"
               >
                 Ajouter la carte
               </button>
@@ -786,7 +785,7 @@ export default function CardsPage() {
         </div>
 
         {showFilters && (
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-4">
+          <div className="surface rounded-2xl p-4 space-y-4">
             <div>
               <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
                 Catégorie
@@ -870,27 +869,46 @@ export default function CardsPage() {
 
         {/* Stats */}
         {filteredCards.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Montant investi</p>
-              <p className="text-2xl font-bold text-dark-50">
-                €{totalInvested.toFixed(2)}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="surface rounded-2xl px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Montant investi
+              </p>
+              <p className="text-2xl font-bold text-dark-50 mt-0.5">
+                {totalInvested.toFixed(2)} €
               </p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Valeur actuelle</p>
-              <p className="text-2xl font-bold text-dark-50">
-                €{totalValue.toFixed(2)}
+            <div className="surface-gold rounded-2xl px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Valeur actuelle
+              </p>
+              <p className="text-2xl font-bold text-brand-primary mt-0.5">
+                {totalValue.toFixed(2)} €
               </p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Gain potentiel</p>
+            <div
+              className={`rounded-2xl px-4 py-3 border ${
+                potentialGain > 0
+                  ? "bg-green-500/8 border-green-500/25"
+                  : potentialGain < 0
+                    ? "bg-red-500/8 border-red-500/25"
+                    : "surface"
+              }`}
+            >
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Gain potentiel
+              </p>
               <p
-                className={`text-2xl font-bold ${
-                  potentialGain >= 0 ? "text-green-400" : "text-red-400"
+                className={`text-2xl font-bold mt-0.5 ${
+                  potentialGain > 0
+                    ? "text-green-400"
+                    : potentialGain < 0
+                      ? "text-red-400"
+                      : "text-dark-300"
                 }`}
               >
-                €{potentialGain.toFixed(2)}
+                {potentialGain >= 0 ? "+" : ""}
+                {(potentialGain).toFixed(2)} €
               </p>
             </div>
           </div>
@@ -902,14 +920,14 @@ export default function CardsPage() {
             <p className="text-dark-400">Chargement...</p>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div className="text-center py-12 bg-dark-800/50 rounded-xl">
+          <div className="text-center py-12 surface rounded-2xl">
             <p className="text-dark-400 mb-4">
               {cards.length === 0 ? "Aucune carte pour le moment" : "Aucune carte ne correspond aux filtres"}
             </p>
             {cards.length === 0 && (
               <button
                 onClick={() => setShowForm(true)}
-                className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition"
+                className="px-4 py-2 btn-gold rounded-lg font-semibold  transition"
               >
                 Ajouter votre première carte
               </button>
@@ -929,7 +947,7 @@ export default function CardsPage() {
               return (
                 <div
                   key={card.id}
-                  className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group"
+                  className="surface rounded-xl overflow-hidden surface-hover transition group"
                 >
                   <div
                     onClick={() => setDetailCard(card)}
@@ -947,15 +965,6 @@ export default function CardsPage() {
                           className="px-1 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] leading-none"
                         >
                           {getLanguage(card.language).flag}
-                        </span>
-                      )}
-                      {card.condition && (
-                        <span
-                          className={`px-1 py-0.5 border rounded text-[9px] font-bold leading-none ${
-                            CONDITION_STYLES[card.condition] || "bg-dark-950/90 text-dark-200 border-dark-600"
-                          }`}
-                        >
-                          {card.condition}
                         </span>
                       )}
                     </div>
@@ -1377,7 +1386,7 @@ export default function CardsPage() {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                    className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
                   >
                     Enregistrer
                   </button>

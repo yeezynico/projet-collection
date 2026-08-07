@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }) {
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-2xl p-8 shadow-lg">
+        <div className="surface rounded-3xl p-8 shadow-lg">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-dark-50 mb-2">
               Pokémon Collection

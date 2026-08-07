@@ -63,7 +63,7 @@ export default function RegisterForm() {
           value={name}
           onChange={(e) => setName(e.target.value)}
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -78,7 +78,7 @@ export default function RegisterForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -93,7 +93,7 @@ export default function RegisterForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -108,7 +108,7 @@ export default function RegisterForm() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           required
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -121,14 +121,14 @@ export default function RegisterForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-secondary text-white font-semibold rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-4 py-2 btn-gold font-semibold rounded-xl hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? "Inscription..." : "S'inscrire"}
       </button>
 
       <p className="text-center text-dark-400">
         Déjà un compte ?{" "}
-        <Link href="/login" className="text-brand-primary hover:text-brand-secondary font-semibold">
+        <Link href="/login" className="text-brand-primary hover:text-brand-light font-semibold">
           Se connecter
         </Link>
       </p>

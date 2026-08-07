@@ -3,30 +3,129 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import DashboardLayout from "@/components/dashboard/Layout";
 import { getStats } from "@/lib/stats";
-import { Cpu, Package, TrendingUp, ArrowRight } from "lucide-react";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  ShoppingCart,
+  ChevronRight,
+  Layers,
+  Package,
+} from "lucide-react";
+import { getImageSrc } from "@/lib/image";
 
 export const metadata = {
-  title: "Dashboard | Pokémon Collection",
+  title: "Portefeuille | Pokémon Collection",
 };
 
 export const dynamic = "force-dynamic";
 
-function fmt(n) {
-  return `€${(n ?? 0).toFixed(2)}`;
+function eur(n) {
+  return `${(n ?? 0).toFixed(2)} €`;
 }
 
-function GainBadge({ gain, percentage, size = "md" }) {
-  const positive = gain >= 0;
-  const color = gain === 0 ? "text-dark-400" : positive ? "text-green-400" : "text-red-400";
-  const textSize = size === "lg" ? "text-lg" : "text-sm";
+/** Variation chiffrée, colorée selon le sens. */
+function Delta({ value, percentage, className = "", iconSize = 15, percentClass = "" }) {
+  if (value == null) return null;
+  const positive = value > 0;
+  const neutral = value === 0;
+  const Icon = positive ? TrendingUp : TrendingDown;
 
   return (
-    <span className={`font-semibold ${color} ${textSize}`}>
-      {positive ? "+" : ""}{fmt(gain)}
-      {percentage !== null && percentage !== undefined && (
-        <span className="opacity-80"> ({positive ? "+" : ""}{percentage.toFixed(1)}%)</span>
+    <span
+      className={`inline-flex items-center gap-1.5 font-bold ${
+        neutral ? "text-dark-400" : positive ? "text-green-400" : "text-red-400"
+      } ${className}`}
+    >
+      {!neutral && <Icon size={iconSize} />}
+      {positive ? "+" : ""}
+      {eur(value)}
+      {percentage != null && (
+        <span className={`opacity-70 font-semibold ${percentClass}`}>
+          ({positive ? "+" : ""}
+          {percentage.toFixed(1)} %)
+        </span>
       )}
     </span>
+  );
+}
+
+/**
+ * Aperçu de la collection en éventail, occupant la zone libre à droite
+ * des chiffres : entièrement visible, sans débord ni chevauchement.
+ */
+function PreviewStack({ images, sealed }) {
+  if (!images?.length) return null;
+
+  return (
+    <div
+      aria-hidden
+      className="absolute right-6 bottom-5 flex items-end -space-x-6 pointer-events-none"
+    >
+      {images.map((src, i) => (
+        <div
+          key={i}
+          style={{
+            zIndex: images.length - i,
+            rotate: `${(i - 1) * 7}deg`,
+            translate: `0 ${Math.abs(i - 1) * 5}px`,
+          }}
+          className={`w-20 ${
+            sealed ? "aspect-square" : "aspect-3/4"
+          } rounded-lg overflow-hidden bg-dark-950 ring-1 ring-white/12 shadow-[0_12px_28px_-8px_rgba(0,0,0,0.9)]`}
+        >
+          <img
+            src={getImageSrc(src)}
+            alt=""
+            className={`w-full h-full ${sealed ? "object-contain p-1" : "object-cover"}`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Carte de synthèse pour une catégorie de collection. */
+function SegmentCard({ href, icon: Icon, label, count, stats, accent, sealed }) {
+  return (
+    <Link
+      href={href}
+      className="surface surface-hover group relative overflow-hidden rounded-2xl p-4 transition"
+    >
+      <div className="relative z-10 flex items-center justify-between mb-3">
+        <span className="flex items-center gap-2.5">
+          <span className={`p-2 rounded-xl ${accent}`}>
+            <Icon size={17} />
+          </span>
+          <span>
+            <span className="block font-semibold text-dark-50">{label}</span>
+            <span className="block text-xs text-dark-400">
+              {count} élément{count > 1 ? "s" : ""}
+            </span>
+          </span>
+        </span>
+        <ChevronRight
+          size={18}
+          className="text-dark-600 group-hover:text-brand-primary group-hover:translate-x-0.5 transition"
+        />
+      </div>
+
+      <div className="relative z-10 min-w-0 pr-40">
+        <p className="text-2xl font-bold text-dark-50">{eur(stats.value)}</p>
+        <p className="text-sm text-dark-300 mt-0.5">
+          {eur(stats.invested)} investis
+        </p>
+        <div className="mt-1.5">
+          <Delta
+            value={stats.gain}
+            percentage={stats.gainPercentage}
+            className="text-sm"
+          />
+        </div>
+      </div>
+
+      <PreviewStack images={stats.previews} sealed={sealed} />
+    </Link>
   );
 }
 
@@ -41,114 +140,121 @@ export default async function DashboardPage() {
 
   return (
     <DashboardLayout user={session.user}>
-      <div className="space-y-6 max-w-5xl">
+      <div className="space-y-4 max-w-6xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold text-dark-50">
-            Bonjour, {session.user.name || "Collectionneur"}
-          </h1>
-          <p className="text-dark-400 text-sm mt-1">
-            Aperçu de votre collection Pokémon
+          <h1 className="text-2xl font-bold text-dark-50">Portefeuille</h1>
+          <p className="text-dark-500 text-sm mt-0.5">
+            Bonjour {session.user.name || "collectionneur"}, voici votre collection.
           </p>
         </div>
 
-        {/* Hero: valeur totale */}
-        <div className="bg-linear-to-br from-brand-primary/10 via-dark-800/50 to-brand-secondary/10 border border-dark-700 rounded-2xl p-8">
-          <p className="text-dark-400 text-sm mb-2">Valeur totale de la collection</p>
-          <div className="flex items-end gap-4 flex-wrap">
-            <p className="text-4xl md:text-5xl font-bold text-dark-50">
-              {fmt(stats.currentValue)}
-            </p>
-            <div className="pb-1.5">
-              <GainBadge gain={stats.potentialGain} percentage={stats.potentialPercentage} size="lg" />
+        {/* Valeur totale */}
+        <div className="surface rounded-3xl p-5 sm:p-6">
+          <div className="flex items-center gap-2.5 mb-3">
+            <span className="p-2 rounded-xl bg-brand-primary/12 text-brand-primary">
+              <Wallet size={17} />
+            </span>
+            <div>
+              <p className="font-semibold text-dark-50 leading-tight">
+                Portefeuille global
+              </p>
+              <p className="text-xs text-dark-400">Valeur totale estimée</p>
             </div>
           </div>
-          <p className="text-dark-500 text-sm mt-3">
-            {fmt(stats.totalInvested)} investis · {stats.totalItems} article{stats.totalItems > 1 ? "s" : ""}
+
+          <p className="text-3xl sm:text-4xl font-bold text-gradient-gold">
+            {eur(stats.currentValue)}
           </p>
-        </div>
 
-        {/* Répartition Cartes / Scellés */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link
-            href="/cards"
-            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-brand-primary/50 transition group"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-brand-primary/10 rounded-lg">
-                  <Cpu size={18} className="text-brand-primary" />
-                </div>
-                <span className="font-semibold text-dark-50">Cartes</span>
-                <span className="text-dark-500 text-sm">· {stats.totalCards}</span>
-              </div>
-              <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 group-hover:text-brand-primary transition" />
+          {/* Mêmes tailles que les cartes de catégorie, pour que l'œil
+              compare les montants sans changer d'échelle. */}
+          <div className="grid grid-cols-2 gap-3 mt-4">
+            <div className="surface rounded-2xl px-4 py-3">
+              <p className="text-sm text-dark-300 mb-1">Gain potentiel</p>
+              <Delta
+                value={stats.potentialGain}
+                percentage={stats.potentialPercentage}
+                className="text-2xl"
+                iconSize={20}
+                percentClass="text-base"
+              />
             </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-              <div>
-                <p className="text-dark-500 text-xs">Investi</p>
-                <p className="text-dark-200 font-medium">{fmt(stats.cards.invested)}</p>
-              </div>
-              <div>
-                <p className="text-dark-500 text-xs">Valeur actuelle</p>
-                <p className="text-dark-200 font-medium">{fmt(stats.cards.value)}</p>
-              </div>
-            </div>
-
-            <GainBadge gain={stats.cards.gain} percentage={stats.cards.gainPercentage} />
-          </Link>
-
-          <Link
-            href="/sealed"
-            className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-brand-secondary/50 transition group"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-brand-secondary/10 rounded-lg">
-                  <Package size={18} className="text-brand-secondary" />
-                </div>
-                <span className="font-semibold text-dark-50">Scellés</span>
-                <span className="text-dark-500 text-sm">· {stats.totalSealed}</span>
-              </div>
-              <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 group-hover:text-brand-secondary transition" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-              <div>
-                <p className="text-dark-500 text-xs">Investi</p>
-                <p className="text-dark-200 font-medium">{fmt(stats.sealed.invested)}</p>
-              </div>
-              <div>
-                <p className="text-dark-500 text-xs">Valeur actuelle</p>
-                <p className="text-dark-200 font-medium">{fmt(stats.sealed.value)}</p>
-              </div>
-            </div>
-
-            <GainBadge gain={stats.sealed.gain} percentage={stats.sealed.gainPercentage} />
-          </Link>
-        </div>
-
-        {/* Gain réalisé */}
-        <Link
-          href="/sales"
-          className="flex items-center justify-between bg-dark-800/50 backdrop-blur border border-dark-700 rounded-xl p-5 hover:border-dark-600 transition group"
-        >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-500/10 rounded-lg">
-              <TrendingUp size={18} className="text-green-400" />
-            </div>
-            <div>
-              <p className="font-semibold text-dark-50">Gain réalisé</p>
-              <p className="text-dark-500 text-xs">
-                {stats.totalSales} vente{stats.totalSales > 1 ? "s" : ""} au total
+            <div className="surface rounded-2xl px-4 py-3">
+              <p className="text-sm text-dark-300 mb-1">Total investi</p>
+              <p className="text-2xl font-bold text-dark-50 flex items-center gap-1.5">
+                <ShoppingCart size={20} className="text-dark-400" />
+                {eur(stats.totalInvested)}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <GainBadge gain={stats.totalRealized} percentage={stats.realizedPercentage} size="lg" />
-            <ArrowRight size={16} className="text-dark-500 group-hover:translate-x-0.5 transition" />
+        </div>
+
+        {/* Répartition : les trois blocs partagent une rangée pour que la
+            page tienne à l'écran sans défilement. */}
+        <div>
+          <h2 className="text-sm font-semibold text-dark-300 mb-2.5">
+            Mes investissements
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <SegmentCard
+              href="/cards"
+              icon={Layers}
+              label="Cartes"
+              count={stats.totalCards}
+              stats={stats.cards}
+              accent="bg-brand-primary/12 text-brand-primary"
+            />
+            <SegmentCard
+              href="/sealed"
+              icon={Package}
+              label="Produits scellés"
+              count={stats.totalSealed}
+              stats={stats.sealed}
+              accent="bg-sky-500/12 text-sky-400"
+              sealed
+            />
+
+            {/* Les ventes complètent la rangée : même gabarit que les
+                deux catégories, avec le montant déjà encaissé. */}
+            <Link
+              href="/sales"
+              className="surface surface-hover group relative overflow-hidden rounded-2xl p-4 transition"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="flex items-center gap-2.5">
+                  <span className="p-2 rounded-xl bg-green-500/12 text-green-400">
+                    <TrendingUp size={17} />
+                  </span>
+                  <span>
+                    <span className="block font-semibold text-dark-50">
+                      Ventes
+                    </span>
+                    <span className="block text-xs text-dark-400">
+                      {stats.totalSales} réalisée
+                      {stats.totalSales > 1 ? "s" : ""}
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight
+                  size={18}
+                  className="text-dark-600 group-hover:text-brand-primary group-hover:translate-x-0.5 transition"
+                />
+              </div>
+
+              <p className="text-2xl font-bold text-dark-50">
+                {eur(stats.totalSold)}
+              </p>
+              <p className="text-sm text-dark-300 mt-0.5">encaissés</p>
+              <div className="mt-1.5">
+                <Delta
+                  value={stats.totalRealized}
+                  percentage={stats.realizedPercentage}
+                  className="text-sm"
+                />
+              </div>
+            </Link>
           </div>
-        </Link>
+        </div>
       </div>
     </DashboardLayout>
   );

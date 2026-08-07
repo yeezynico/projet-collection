@@ -9,10 +9,10 @@ export default function DashboardLayout({ children, user }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-dark-950">
+    <div className="min-h-screen">
       {/* Sidebar — toujours fixe, ne scrolle jamais avec la page */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-800/95 backdrop-blur border-r border-dark-700 transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-dark-900/95 backdrop-blur-xl border-r border-white/6 transition-transform lg:translate-x-0 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

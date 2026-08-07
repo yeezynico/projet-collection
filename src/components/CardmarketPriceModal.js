@@ -99,7 +99,7 @@ export default function CardmarketPriceModal({
                 href={filteredUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                className="flex items-center justify-center gap-2 w-full px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
               >
                 <ExternalLink size={16} />
                 Ouvrir Cardmarket

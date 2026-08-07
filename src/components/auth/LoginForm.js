@@ -45,7 +45,7 @@ export default function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -60,7 +60,7 @@ export default function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           disabled={loading}
-          className="w-full px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
+          className="w-full px-4 py-2 bg-dark-900 border border-dark-700 rounded-xl text-dark-50 placeholder-dark-500 focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition"
         />
       </div>
 
@@ -73,14 +73,14 @@ export default function LoginForm() {
       <button
         type="submit"
         disabled={loading}
-        className="w-full px-4 py-2 bg-gradient-to-r from-brand-primary to-brand-secondary text-white font-semibold rounded-lg hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full px-4 py-2 btn-gold font-semibold rounded-xl hover:shadow-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {loading ? "Connexion..." : "Se connecter"}
       </button>
 
       <p className="text-center text-dark-400">
         Pas encore de compte ?{" "}
-        <Link href="/register" className="text-brand-primary hover:text-brand-secondary font-semibold">
+        <Link href="/register" className="text-brand-primary hover:text-brand-light font-semibold">
           S'inscrire
         </Link>
       </p>

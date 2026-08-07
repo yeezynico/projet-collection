@@ -14,7 +14,7 @@ export default function SettingsPage() {
           <p className="text-dark-400 mt-1">Gérez votre compte et préférences</p>
         </div>
 
-        <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-6">
+        <div className="surface rounded-2xl p-6">
           <h2 className="text-xl font-semibold text-dark-50 mb-4">Informations du compte</h2>
           <div className="space-y-4">
             <div>
@@ -29,28 +29,6 @@ export default function SettingsPage() {
                 {session?.user?.name || "Non défini"}
               </p>
             </div>
-            <div>
-              <label className="text-sm text-dark-400 block mb-1">ID utilisateur</label>
-              <p className="px-4 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50 text-xs font-mono">
-                {session?.user?.id}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-6">
-          <h2 className="text-xl font-semibold text-dark-50 mb-4">À propos</h2>
-          <div className="space-y-4 text-dark-400">
-            <p>
-              <strong className="text-dark-200">Pokémon Collection v1.0</strong>
-            </p>
-            <p>
-              Application de gestion de collection Pokémon avec suivi des cartes,
-              produits scellés et historique des ventes.
-            </p>
-            <p className="text-sm">
-              Built with Next.js, Prisma, PostgreSQL et Tailwind CSS.
-            </p>
           </div>
         </div>
 

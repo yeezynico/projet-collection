@@ -1,5 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
+/** Quelques illustrations pour donner un aperçu visuel de la catégorie. */
+function previews(items, max = 3) {
+  return items
+    .filter((i) => i.imageUrl)
+    .slice(0, max)
+    .map((i) => i.imageUrl);
+}
+
 function breakdown(items) {
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
   const invested = items.reduce((sum, i) => sum + i.purchasePrice * i.quantity, 0);
@@ -10,7 +18,14 @@ function breakdown(items) {
   const gain = value - invested;
   const gainPercentage = invested > 0 ? (gain / invested) * 100 : null;
 
-  return { count, invested, value, gain, gainPercentage };
+  return {
+    count,
+    invested,
+    value,
+    gain,
+    gainPercentage,
+    previews: previews(items),
+  };
 }
 
 export async function getStats(userId) {
@@ -31,6 +46,10 @@ export async function getStats(userId) {
     totalInvested > 0 ? (potentialGain / totalInvested) * 100 : null;
 
   const totalRealized = sales.reduce((sum, sale) => sum + sale.gain, 0);
+  const totalSold = sales.reduce(
+    (sum, sale) => sum + sale.salePrice * sale.quantity,
+    0
+  );
   const totalSaleCost = sales.reduce(
     (sum, sale) => sum + sale.purchasePrice * sale.quantity,
     0
@@ -47,6 +66,7 @@ export async function getStats(userId) {
     potentialGain,
     potentialPercentage,
     totalRealized,
+    totalSold,
     realizedPercentage,
     totalSales: sales.length,
     cards: cardsStats,

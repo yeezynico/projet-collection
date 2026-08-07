@@ -19,7 +19,6 @@ import {
   SEALED_TYPES,
   LANGUAGES,
   CONDITIONS,
-  CONDITION_STYLES,
   getLanguage,
 } from "@/lib/categories";
 import { buildFilteredUrl } from "@/lib/cardmarket";
@@ -323,14 +322,14 @@ export default function SealedPage() {
           </div>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+            className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
           >
             <Plus size={20} /> Ajouter
           </button>
         </div>
 
         {showForm && (
-          <form onSubmit={handleSubmit} className="bg-dark-800/50 border border-dark-700 rounded-xl p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="surface rounded-2xl p-6 space-y-4">
             <h2 className="text-xl font-semibold text-dark-50 mb-4">Ajouter un produit</h2>
 
             {/* Remplissage automatique depuis un lien Cardmarket */}
@@ -358,7 +357,7 @@ export default function SealedPage() {
                   type="button"
                   onClick={handleLookup}
                   disabled={lookupLoading || !lookupUrl.trim()}
-                  className="flex items-center gap-2 px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold text-sm hover:bg-brand-primary/90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm  transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {lookupLoading ? (
                     <>
@@ -561,7 +560,7 @@ export default function SealedPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition">
+              <button type="submit" className="px-4 py-2 btn-gold rounded-lg font-semibold  transition">
                 Ajouter le produit
               </button>
               <button type="button" onClick={() => setShowForm(false)} className="px-4 py-2 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition">
@@ -599,7 +598,7 @@ export default function SealedPage() {
         </div>
 
         {showFilters && (
-          <div className="bg-dark-800/50 border border-dark-700 rounded-xl p-4 space-y-4">
+          <div className="surface rounded-2xl p-4 space-y-4">
             <div>
               <p className="text-xs font-medium text-dark-400 uppercase tracking-wide mb-2">
                 Type
@@ -682,19 +681,46 @@ export default function SealedPage() {
         )}
 
         {filteredSealed.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Montant investi</p>
-              <p className="text-2xl font-bold text-dark-50">€{totalInvested.toFixed(2)}</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="surface rounded-2xl px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Montant investi
+              </p>
+              <p className="text-2xl font-bold text-dark-50 mt-0.5">
+                {totalInvested.toFixed(2)} €
+              </p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Valeur actuelle</p>
-              <p className="text-2xl font-bold text-dark-50">€{totalValue.toFixed(2)}</p>
+            <div className="surface-gold rounded-2xl px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Valeur actuelle
+              </p>
+              <p className="text-2xl font-bold text-brand-primary mt-0.5">
+                {totalValue.toFixed(2)} €
+              </p>
             </div>
-            <div className="bg-dark-800/50 border border-dark-700 rounded-lg p-4">
-              <p className="text-dark-400 text-sm">Gain potentiel</p>
-              <p className={`text-2xl font-bold ${totalValue - totalInvested >= 0 ? "text-green-400" : "text-red-400"}`}>
-                €{(totalValue - totalInvested).toFixed(2)}
+            <div
+              className={`rounded-2xl px-4 py-3 border ${
+                totalValue - totalInvested > 0
+                  ? "bg-green-500/8 border-green-500/25"
+                  : totalValue - totalInvested < 0
+                    ? "bg-red-500/8 border-red-500/25"
+                    : "surface"
+              }`}
+            >
+              <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                Gain potentiel
+              </p>
+              <p
+                className={`text-2xl font-bold mt-0.5 ${
+                  totalValue - totalInvested > 0
+                    ? "text-green-400"
+                    : totalValue - totalInvested < 0
+                      ? "text-red-400"
+                      : "text-dark-300"
+                }`}
+              >
+                {totalValue - totalInvested >= 0 ? "+" : ""}
+                {(totalValue - totalInvested).toFixed(2)} €
               </p>
             </div>
           </div>
@@ -703,12 +729,12 @@ export default function SealedPage() {
         {loading ? (
           <p className="text-center py-12 text-dark-400">Chargement...</p>
         ) : filteredSealed.length === 0 ? (
-          <div className="text-center py-12 bg-dark-800/50 rounded-xl">
+          <div className="text-center py-12 surface rounded-2xl">
             <p className="text-dark-400 mb-4">
               {sealed.length === 0 ? "Aucun produit pour le moment" : "Aucun produit ne correspond aux filtres"}
             </p>
             {sealed.length === 0 && (
-              <button onClick={() => setShowForm(true)} className="px-4 py-2 bg-brand-primary text-white rounded-lg font-semibold hover:bg-brand-primary/90 transition">
+              <button onClick={() => setShowForm(true)} className="px-4 py-2 btn-gold rounded-lg font-semibold  transition">
                 Ajouter votre premier produit
               </button>
             )}
@@ -724,7 +750,7 @@ export default function SealedPage() {
                   : null;
 
               return (
-                <div key={item.id} className="bg-dark-800/50 backdrop-blur border border-dark-700 rounded-lg overflow-hidden hover:border-dark-600 transition group">
+                <div key={item.id} className="surface rounded-xl overflow-hidden surface-hover transition group">
                   <div
                     onClick={() => setDetailItem(item)}
                     className="relative aspect-square bg-dark-900 overflow-hidden flex items-center justify-center cursor-pointer"
@@ -741,15 +767,6 @@ export default function SealedPage() {
                           className="px-1 py-0.5 bg-dark-950/90 border border-dark-600 rounded text-[10px] leading-none"
                         >
                           {getLanguage(item.language).flag}
-                        </span>
-                      )}
-                      {item.condition && (
-                        <span
-                          className={`px-1 py-0.5 border rounded text-[9px] font-bold leading-none ${
-                            CONDITION_STYLES[item.condition] || "bg-dark-950/90 text-dark-200 border-dark-600"
-                          }`}
-                        >
-                          {item.condition}
                         </span>
                       )}
                     </div>
@@ -1091,7 +1108,7 @@ export default function SealedPage() {
                 <div className="flex gap-2 pt-2">
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-brand-primary to-brand-secondary text-white rounded-lg font-semibold hover:shadow-lg transition"
+                    className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
                   >
                     Enregistrer
                   </button>

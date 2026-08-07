@@ -29,7 +29,7 @@ export default function Sidebar({ user, onClose }) {
       {/* Logo */}
       <div className="p-6 border-b border-dark-700 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-dark-50">PC</h1>
+          <h1 className="text-xl font-bold text-gradient-gold">PC</h1>
           <p className="text-xs text-dark-400">Pokémon Collection</p>
         </div>
         <button onClick={onClose} className="lg:hidden text-dark-400">
@@ -46,10 +46,10 @@ export default function Sidebar({ user, onClose }) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition ${
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition ${
                 isActive
-                  ? "bg-brand-primary/20 text-brand-primary border border-brand-primary/30"
-                  : "text-dark-300 hover:bg-dark-700/50"
+                  ? "bg-brand-primary/12 text-brand-primary border border-brand-primary/25"
+                  : "text-dark-400 hover:bg-white/5 hover:text-dark-100"
               }`}
               onClick={onClose}
             >
