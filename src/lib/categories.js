@@ -31,6 +31,7 @@ export const LANGUAGES = [
   { value: "IT", label: "Italien", flag: "🇮🇹", cmId: 5 },
   { value: "PT", label: "Portugais", flag: "🇵🇹", cmId: 8 },
   { value: "KR", label: "Coréen", flag: "🇰🇷", cmId: 10 },
+  { value: "CN", label: "Chinois", flag: "🇨🇳", cmId: 6 },
 ];
 
 // `cmId` correspond au paramètre `minCondition` des URLs Cardmarket.
