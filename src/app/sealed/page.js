@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
+import Modal from "@/components/ui/Modal";
 import {
   SEALED_TYPES,
   LANGUAGES,
@@ -851,278 +852,280 @@ export default function SealedPage() {
 
         {/* Sell Modal */}
         {sellingItem && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
-                  {sellingItem.imageUrl ? (
-                    <img
-                      src={getImageSrc(sellingItem.imageUrl)}
-                      alt={sellingItem.name}
-                      className="w-full h-full object-contain p-1"
-                    />
-                  ) : (
-                    <ImageOff size={24} className="text-dark-600" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
-                    <Tag size={12} /> Vente
-                  </p>
-                  <h2 className="text-lg font-semibold text-dark-50">
-                    {sellingItem.name}
-                  </h2>
-                </div>
-              </div>
-
-              <form onSubmit={handleSell} className="space-y-4">
-                {sellingItem.quantity > 1 && (
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Quantité à vendre * (max {sellingItem.quantity})
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max={sellingItem.quantity}
-                      required
-                      value={sellData.quantity}
-                      onChange={(e) => setSellData({ ...sellData, quantity: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
+          <Modal
+            onClose={() => setSellingItem(null)}
+            panelClassName="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                {sellingItem.imageUrl ? (
+                  <img
+                    src={getImageSrc(sellingItem.imageUrl)}
+                    alt={sellingItem.name}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <ImageOff size={24} className="text-dark-600" />
                 )}
+              </div>
+              <div>
+                <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                  <Tag size={12} /> Vente
+                </p>
+                <h2 className="text-lg font-semibold text-dark-50">
+                  {sellingItem.name}
+                </h2>
+              </div>
+            </div>
 
+            <form onSubmit={handleSell} className="space-y-4">
+              {sellingItem.quantity > 1 && (
                 <div>
                   <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Prix de vente (€) *
+                    Quantité à vendre * (max {sellingItem.quantity})
                   </label>
                   <input
                     type="number"
-                    step="0.01"
+                    min="1"
+                    max={sellingItem.quantity}
                     required
-                    autoFocus
-                    value={sellData.salePrice}
-                    onChange={(e) => setSellData({ ...sellData, salePrice: e.target.value })}
+                    value={sellData.quantity}
+                    onChange={(e) => setSellData({ ...sellData, quantity: e.target.value })}
                     className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                   />
                 </div>
+              )}
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Date de vente
-                  </label>
-                  <input
-                    type="date"
-                    value={sellData.saleDate}
-                    onChange={(e) => setSellData({ ...sellData, saleDate: e.target.value })}
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Prix de vente (€) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  autoFocus
+                  value={sellData.salePrice}
+                  onChange={(e) => setSellData({ ...sellData, salePrice: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button type="submit" className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition">
-                    Confirmer la vente
-                  </button>
-                  <button type="button" onClick={() => setSellingItem(null)} className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition">
-                    Annuler
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Date de vente
+                </label>
+                <input
+                  type="date"
+                  value={sellData.saleDate}
+                  onChange={(e) => setSellData({ ...sellData, saleDate: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition">
+                  Confirmer la vente
+                </button>
+                <button type="button" onClick={() => setSellingItem(null)} className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition">
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
 
         {/* Edit Modal */}
         {editingItem && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
-                  {editData.imageUrl ? (
-                    <img
-                      src={getImageSrc(editData.imageUrl)}
-                      alt={editData.name}
-                      className="w-full h-full object-contain p-1"
-                    />
-                  ) : (
-                    <ImageOff size={24} className="text-dark-600" />
-                  )}
+          <Modal
+            onClose={() => setEditingItem(null)}
+            panelClassName="bg-dark-800 border border-dark-600 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col overflow-hidden"
+          >
+            <div className="flex items-center gap-4 p-6 pb-4 shrink-0">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                {editData.imageUrl ? (
+                  <img
+                    src={getImageSrc(editData.imageUrl)}
+                    alt={editData.name}
+                    className="w-full h-full object-contain p-1"
+                  />
+                ) : (
+                  <ImageOff size={24} className="text-dark-600" />
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                  <Pencil size={12} /> Modifier
+                </p>
+                <h2 className="text-lg font-semibold text-dark-50 truncate">
+                  {editingItem.name}
+                </h2>
+              </div>
+            </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4 overflow-y-auto px-6 pb-6">
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">Nom *</label>
+                <input
+                  type="text"
+                  required
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Type *</label>
+                  <select
+                    required
+                    value={editData.type}
+                    onChange={(e) => setEditData({ ...editData, type: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    <option value="">Choisir...</option>
+                    {SEALED_TYPES.map((type) => (
+                      <option key={type.value} value={type.value}>
+                        {type.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
-                    <Pencil size={12} /> Modifier
-                  </p>
-                  <h2 className="text-lg font-semibold text-dark-50 truncate">
-                    {editingItem.name}
-                  </h2>
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Langue</label>
+                  <select
+                    value={editData.language}
+                    onChange={(e) => setEditData({ ...editData, language: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    <option value="">Non précisée</option>
+                    {LANGUAGES.map((lang) => (
+                      <option key={lang.value} value={lang.value}>
+                        {lang.flag} {lang.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">État</label>
+                  <select
+                    value={editData.condition}
+                    onChange={(e) => setEditData({ ...editData, condition: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    <option value="">Non précisé</option>
+                    {CONDITIONS.map((c) => (
+                      <option key={c.value} value={c.value}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">Nom *</label>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Quantité *</label>
                   <input
-                    type="text"
+                    type="number"
+                    min="1"
                     required
-                    value={editData.name}
-                    onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                    value={editData.quantity}
+                    onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
                     className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                   />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">Type *</label>
-                    <select
-                      required
-                      value={editData.type}
-                      onChange={(e) => setEditData({ ...editData, type: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    >
-                      <option value="">Choisir...</option>
-                      {SEALED_TYPES.map((type) => (
-                        <option key={type.value} value={type.value}>
-                          {type.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">Langue</label>
-                    <select
-                      value={editData.language}
-                      onChange={(e) => setEditData({ ...editData, language: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    >
-                      <option value="">Non précisée</option>
-                      {LANGUAGES.map((lang) => (
-                        <option key={lang.value} value={lang.value}>
-                          {lang.flag} {lang.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">État</label>
-                    <select
-                      value={editData.condition}
-                      onChange={(e) => setEditData({ ...editData, condition: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    >
-                      <option value="">Non précisé</option>
-                      {CONDITIONS.map((c) => (
-                        <option key={c.value} value={c.value}>
-                          {c.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Prix d'achat (€) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editData.purchasePrice}
+                    onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">Quantité *</label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={editData.quantity}
-                      onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix d'achat (€) *</label>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Prix actuel (€)</label>
+                  <div className="flex gap-2">
                     <input
                       type="number"
                       step="0.01"
-                      required
-                      value={editData.purchasePrice}
-                      onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                      value={editData.currentPrice}
+                      onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
+                      className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">Prix actuel (€)</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={editData.currentPrice}
-                        onChange={(e) => setEditData({ ...editData, currentPrice: e.target.value })}
-                        className="flex-1 min-w-0 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                      />
-                      {editData.cardmarketUrl && (
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setPriceHelper({
-                              url: editData.cardmarketUrl,
-                              language: editData.language,
-                              target: "edit",
-                            })
-                          }
-                          title="Relever le prix français sur Cardmarket"
-                          className="flex items-center gap-1.5 px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0 text-sm whitespace-nowrap"
-                        >
-                          <ExternalLink size={15} /> Relever
-                        </button>
-                      )}
-                    </div>
+                    {editData.cardmarketUrl && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPriceHelper({
+                            url: editData.cardmarketUrl,
+                            language: editData.language,
+                            target: "edit",
+                          })
+                        }
+                        title="Relever le prix français sur Cardmarket"
+                        className="flex items-center gap-1.5 px-3 bg-dark-700 text-dark-200 rounded-lg hover:bg-dark-600 transition shrink-0 text-sm whitespace-nowrap"
+                      >
+                        <ExternalLink size={15} /> Relever
+                      </button>
+                    )}
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">Lien Cardmarket</label>
-                  <input
-                    type="url"
-                    value={editData.cardmarketUrl}
-                    onChange={(e) => setEditData({ ...editData, cardmarketUrl: e.target.value })}
-                    placeholder="https://www.cardmarket.com/..."
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">Lien Cardmarket</label>
+                <input
+                  type="url"
+                  value={editData.cardmarketUrl}
+                  onChange={(e) => setEditData({ ...editData, cardmarketUrl: e.target.value })}
+                  placeholder="https://www.cardmarket.com/..."
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">URL de l'image</label>
-                  <input
-                    type="url"
-                    value={editData.imageUrl}
-                    onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">URL de l'image</label>
+                <input
+                  type="url"
+                  value={editData.imageUrl}
+                  onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">Date d'achat</label>
-                  <input
-                    type="date"
-                    value={editData.purchaseDate}
-                    onChange={(e) => setEditData({ ...editData, purchaseDate: e.target.value })}
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">Date d'achat</label>
+                <input
+                  type="date"
+                  value={editData.purchaseDate}
+                  onChange={(e) => setEditData({ ...editData, purchaseDate: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
-                  >
-                    Enregistrer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingItem(null)}
-                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
+                >
+                  Enregistrer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingItem(null)}
+                  className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
 
 

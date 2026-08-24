@@ -5,6 +5,7 @@ import { X, ExternalLink, Check } from "lucide-react";
 import { extractListings, average } from "@/lib/priceExtract";
 import { buildFilteredUrl } from "@/lib/cardmarket";
 import { CONDITION_STYLES } from "@/lib/categories";
+import { useModalDismiss } from "@/components/ui/Modal";
 
 const DEFAULT_KEPT = 5;
 
@@ -24,6 +25,8 @@ export default function CardmarketPriceModal({
   onApply,
   onClose,
 }) {
+  useModalDismiss(onClose);
+
   const [pasted, setPasted] = useState("");
   const [selected, setSelected] = useState(null);
 

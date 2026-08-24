@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
 import { X, ImageOff, ExternalLink } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
+import { useModalDismiss } from "@/components/ui/Modal";
 import { buildFilteredUrl } from "@/lib/cardmarket";
 import {
   CONDITION_STYLES,
@@ -54,22 +54,7 @@ function MarketRow({ href, logo, name, subtitle }) {
  * puis comparaison des places de marché.
  */
 export default function ItemDetailModal({ item, kind = "card", onClose }) {
-  useEffect(() => {
-    if (!item) return;
-
-    function onKey(e) {
-      if (e.key === "Escape") onClose();
-    }
-
-    document.addEventListener("keydown", onKey);
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previous;
-    };
-  }, [item, onClose]);
+  useModalDismiss(onClose, !!item);
 
   if (!item) return null;
 

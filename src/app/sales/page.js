@@ -5,6 +5,7 @@ import DashboardLayout from "@/components/dashboard/Layout";
 import { useSession } from "next-auth/react";
 import { ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus, Link2, Loader2 } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
+import Modal from "@/components/ui/Modal";
 import { CARD_CATEGORIES, SEALED_TYPES } from "@/lib/categories";
 
 const TYPE_LABELS = {
@@ -832,341 +833,346 @@ export default function SalesPage() {
 
         {/* Ajout d'une vente non rattachée à la collection */}
         {showAddForm && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
-              <div className="mb-5">
-                <h2 className="text-lg font-semibold text-dark-50">
-                  Ajouter une vente
-                </h2>
-                <p className="text-sm text-dark-400 mt-1">
-                  Pour une vente réalisée sans que l'article soit dans votre
-                  collection. Rien ne sera retiré des cartes ou scellés.
-                </p>
-              </div>
-
-              {/* Remplissage automatique : le même champ accepte une carte
-                  comme un produit scellé, le type étant déduit du lien. */}
-              <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3 mb-4">
-                <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
-                  <Link2 size={16} className="text-brand-primary" />
-                  Remplissage automatique depuis Cardmarket
-                </label>
-
-                <div className="flex gap-2 flex-wrap">
-                  <input
-                    type="url"
-                    value={lookupUrl}
-                    onChange={(e) => setLookupUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleLookup();
-                      }
-                    }}
-                    placeholder="Lien d'une carte ou d'un produit scellé"
-                    className="flex-1 min-w-56 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleLookup}
-                    disabled={lookupLoading || !lookupUrl.trim()}
-                    className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm  transition disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {lookupLoading ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" /> Recherche...
-                      </>
-                    ) : (
-                      "Récupérer"
-                    )}
-                  </button>
-                </div>
-
-                {lookupError && <p className="text-sm text-red-400">{lookupError}</p>}
-                {lookupInfo && <p className="text-sm text-green-400">{lookupInfo}</p>}
-
-                {lookupCandidates.length > 1 && (
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                    {lookupCandidates.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => applyLookup(c)}
-                        className={`rounded-lg overflow-hidden border-2 transition ${
-                          addData.itemName === c.name && addData.imageUrl === c.imageUrl
-                            ? "border-brand-primary"
-                            : "border-transparent hover:border-dark-500"
-                        }`}
-                      >
-                        <div className="aspect-3/4 bg-dark-900">
-                          {c.imageUrl && (
-                            <img
-                              src={c.imageUrl}
-                              alt={c.name}
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                        </div>
-                        <p className="text-[10px] text-dark-300 py-0.5 bg-dark-900/80">
-                          n°{c.number}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <form onSubmit={handleAddSale} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Nom de l'article *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={addData.itemName}
-                    onChange={(e) => setAddData({ ...addData, itemName: e.target.value })}
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Type *
-                    </label>
-                    <select
-                      required
-                      value={addData.itemType}
-                      onChange={(e) =>
-                        setAddData({ ...addData, itemType: e.target.value, itemCategory: "" })
-                      }
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    >
-                      {TYPE_OPTIONS.map((t) => (
-                        <option key={t.value} value={t.value}>
-                          {t.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Catégorie
-                    </label>
-                    <select
-                      value={addData.itemCategory}
-                      onChange={(e) =>
-                        setAddData({ ...addData, itemCategory: e.target.value })
-                      }
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    >
-                      <option value="">Non précisée</option>
-                      {(addData.itemType === "card" ? CARD_CATEGORIES : SEALED_TYPES).map(
-                        (c) => (
-                          <option key={c.value} value={c.value}>
-                            {c.label}
-                          </option>
-                        )
-                      )}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Quantité *
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      required
-                      value={addData.quantity}
-                      onChange={(e) => setAddData({ ...addData, quantity: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Prix d'achat (€) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={addData.purchasePrice}
-                      onChange={(e) =>
-                        setAddData({ ...addData, purchasePrice: e.target.value })
-                      }
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Prix de vente (€) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={addData.salePrice}
-                      onChange={(e) => setAddData({ ...addData, salePrice: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Date de vente
-                  </label>
-                  <input
-                    type="date"
-                    value={addData.saleDate}
-                    onChange={(e) => setAddData({ ...addData, saleDate: e.target.value })}
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-dark-200 mb-2">
-                    URL de l'image
-                  </label>
-                  <input
-                    type="url"
-                    value={addData.imageUrl}
-                    onChange={(e) => setAddData({ ...addData, imageUrl: e.target.value })}
-                    placeholder="https://..."
-                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                  />
-                </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition"
-                  >
-                    Enregistrer la vente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      resetAddForm();
-                      setShowAddForm(false);
-                    }}
-                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
-                  >
-                    Annuler
-                  </button>
-                </div>
-              </form>
+          <Modal
+            onClose={() => {
+              resetAddForm();
+              setShowAddForm(false);
+            }}
+            panelClassName="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="mb-5">
+              <h2 className="text-lg font-semibold text-dark-50">
+                Ajouter une vente
+              </h2>
+              <p className="text-sm text-dark-400 mt-1">
+                Pour une vente réalisée sans que l'article soit dans votre
+                collection. Rien ne sera retiré des cartes ou scellés.
+              </p>
             </div>
-          </div>
-        )}
 
-        {/* Edit Modal */}
-        {editingSale && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md shadow-2xl">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
-                  {editingSale.imageUrl ? (
-                    <img
-                      src={getImageSrc(editingSale.imageUrl)}
-                      alt={editingSale.itemName}
-                      className="w-full h-full object-cover"
-                    />
+            {/* Remplissage automatique : le même champ accepte une carte
+                comme un produit scellé, le type étant déduit du lien. */}
+            <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3 mb-4">
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                <Link2 size={16} className="text-brand-primary" />
+                Remplissage automatique depuis Cardmarket
+              </label>
+
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="url"
+                  value={lookupUrl}
+                  onChange={(e) => setLookupUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleLookup();
+                    }
+                  }}
+                  placeholder="Lien d'une carte ou d'un produit scellé"
+                  className="flex-1 min-w-56 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleLookup}
+                  disabled={lookupLoading || !lookupUrl.trim()}
+                  className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm  transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {lookupLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recherche...
+                    </>
                   ) : (
-                    <ImageOff size={24} className="text-dark-600" />
+                    "Récupérer"
                   )}
+                </button>
+              </div>
+
+              {lookupError && <p className="text-sm text-red-400">{lookupError}</p>}
+              {lookupInfo && <p className="text-sm text-green-400">{lookupInfo}</p>}
+
+              {lookupCandidates.length > 1 && (
+                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                  {lookupCandidates.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => applyLookup(c)}
+                      className={`rounded-lg overflow-hidden border-2 transition ${
+                        addData.itemName === c.name && addData.imageUrl === c.imageUrl
+                          ? "border-brand-primary"
+                          : "border-transparent hover:border-dark-500"
+                      }`}
+                    >
+                      <div className="aspect-3/4 bg-dark-900">
+                        {c.imageUrl && (
+                          <img
+                            src={c.imageUrl}
+                            alt={c.name}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
+                      </div>
+                      <p className="text-[10px] text-dark-300 py-0.5 bg-dark-900/80">
+                        n°{c.number}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <form onSubmit={handleAddSale} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Nom de l'article *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={addData.itemName}
+                  onChange={(e) => setAddData({ ...addData, itemName: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Type *
+                  </label>
+                  <select
+                    required
+                    value={addData.itemType}
+                    onChange={(e) =>
+                      setAddData({ ...addData, itemType: e.target.value, itemCategory: "" })
+                    }
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    {TYPE_OPTIONS.map((t) => (
+                      <option key={t.value} value={t.value}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
-                    <Pencil size={12} /> Modifier la vente
-                  </p>
-                  <h2 className="text-lg font-semibold text-dark-50">
-                    {editingSale.itemName}
-                  </h2>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Catégorie
+                  </label>
+                  <select
+                    value={addData.itemCategory}
+                    onChange={(e) =>
+                      setAddData({ ...addData, itemCategory: e.target.value })
+                    }
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  >
+                    <option value="">Non précisée</option>
+                    {(addData.itemType === "card" ? CARD_CATEGORIES : SEALED_TYPES).map(
+                      (c) => (
+                        <option key={c.value} value={c.value}>
+                          {c.label}
+                        </option>
+                      )
+                    )}
+                  </select>
                 </div>
               </div>
 
-              <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Quantité vendue *
+                    Quantité *
                   </label>
                   <input
                     type="number"
                     min="1"
                     required
-                    autoFocus
-                    value={editData.quantity}
-                    onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
+                    value={addData.quantity}
+                    onChange={(e) => setAddData({ ...addData, quantity: e.target.value })}
                     className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                   />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Prix d'achat (€) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={editData.purchasePrice}
-                      onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-dark-200 mb-2">
-                      Prix de vente (€) *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={editData.salePrice}
-                      onChange={(e) => setEditData({ ...editData, salePrice: e.target.value })}
-                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
-                    />
-                  </div>
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-dark-200 mb-2">
-                    Date de vente
+                    Prix d'achat (€) *
                   </label>
                   <input
-                    type="date"
-                    value={editData.saleDate}
-                    onChange={(e) => setEditData({ ...editData, saleDate: e.target.value })}
+                    type="number"
+                    step="0.01"
+                    required
+                    value={addData.purchasePrice}
+                    onChange={(e) =>
+                      setAddData({ ...addData, purchasePrice: e.target.value })
+                    }
                     className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
                   />
                 </div>
-
-                <div className="flex gap-2 pt-2">
-                  <button
-                    type="submit"
-                    className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
-                  >
-                    Enregistrer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEditingSale(null)}
-                    className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
-                  >
-                    Annuler
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Prix de vente (€) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={addData.salePrice}
+                    onChange={(e) => setAddData({ ...addData, salePrice: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
                 </div>
-              </form>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Date de vente
+                </label>
+                <input
+                  type="date"
+                  value={addData.saleDate}
+                  onChange={(e) => setAddData({ ...addData, saleDate: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  URL de l'image
+                </label>
+                <input
+                  type="url"
+                  value={addData.imageUrl}
+                  onChange={(e) => setAddData({ ...addData, imageUrl: e.target.value })}
+                  placeholder="https://..."
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-500 to-emerald-500 text-white rounded-lg font-semibold hover:shadow-lg transition"
+                >
+                  Enregistrer la vente
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetAddForm();
+                    setShowAddForm(false);
+                  }}
+                  className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* Edit Modal */}
+        {editingSale && (
+          <Modal
+            onClose={() => setEditingSale(null)}
+            panelClassName="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto"
+          >
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-16 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+                {editingSale.imageUrl ? (
+                  <img
+                    src={getImageSrc(editingSale.imageUrl)}
+                    alt={editingSale.itemName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <ImageOff size={24} className="text-dark-600" />
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-dark-400 uppercase tracking-wide flex items-center gap-1">
+                  <Pencil size={12} /> Modifier la vente
+                </p>
+                <h2 className="text-lg font-semibold text-dark-50">
+                  {editingSale.itemName}
+                </h2>
+              </div>
             </div>
-          </div>
+
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Quantité vendue *
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  required
+                  autoFocus
+                  value={editData.quantity}
+                  onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Prix d'achat (€) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editData.purchasePrice}
+                    onChange={(e) => setEditData({ ...editData, purchasePrice: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-dark-200 mb-2">
+                    Prix de vente (€) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={editData.salePrice}
+                    onChange={(e) => setEditData({ ...editData, salePrice: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Date de vente
+                </label>
+                <input
+                  type="date"
+                  value={editData.saleDate}
+                  onChange={(e) => setEditData({ ...editData, saleDate: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 btn-gold rounded-lg font-semibold hover:shadow-lg transition"
+                >
+                  Enregistrer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingSale(null)}
+                  className="px-4 py-2.5 bg-dark-700 text-dark-200 rounded-lg font-semibold hover:bg-dark-600 transition"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </Modal>
         )}
       </div>
     </DashboardLayout>
