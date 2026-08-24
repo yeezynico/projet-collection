@@ -24,6 +24,17 @@ function eur(n) {
   return `${(n ?? 0).toFixed(2)} €`;
 }
 
+/**
+ * Nomme la variation selon son sens : « plus-value » n'a de sens qu'au-dessus
+ * de zéro, « moins-value » en dessous.
+ */
+function deltaLabel(value, { realized = false } = {}) {
+  if (value == null) return null;
+  if (value === 0) return realized ? "Résultat des ventes" : "Aucune variation";
+  const sign = value > 0 ? "Plus-value" : "Moins-value";
+  return realized ? `${sign} réalisée` : `${sign} potentielle`;
+}
+
 /** Variation chiffrée, colorée selon le sens. */
 function Delta({ value, percentage, className = "", iconSize = 15, percentClass = "" }) {
   if (value == null) return null;
@@ -56,6 +67,15 @@ function Delta({ value, percentage, className = "", iconSize = 15, percentClass 
   );
 }
 
+/** Intitulé discret qui nomme le montant placé juste en dessous. */
+function Label({ children, className = "" }) {
+  return (
+    <p className={`text-[11px] uppercase tracking-wider text-dark-500 ${className}`}>
+      {children}
+    </p>
+  );
+}
+
 /**
  * Aperçu de la collection en éventail, occupant la zone libre à droite
  * des chiffres : entièrement visible, sans débord ni chevauchement.
@@ -66,7 +86,7 @@ function PreviewStack({ images, sealed }) {
   return (
     <div
       aria-hidden
-      className="absolute right-6 bottom-5 flex items-end -space-x-6 pointer-events-none"
+      className="absolute right-5 bottom-4 flex items-end -space-x-4 pointer-events-none"
     >
       {images.map((src, i) => (
         <div
@@ -76,9 +96,9 @@ function PreviewStack({ images, sealed }) {
             rotate: `${(i - 1) * 7}deg`,
             translate: `0 ${Math.abs(i - 1) * 5}px`,
           }}
-          className={`w-20 ${
+          className={`w-14 ${
             sealed ? "aspect-square" : "aspect-3/4"
-          } rounded-lg overflow-hidden bg-dark-950 ring-1 ring-white/12 shadow-[0_12px_28px_-8px_rgba(0,0,0,0.9)]`}
+          } rounded-md overflow-hidden bg-dark-950 ring-1 ring-white/12 shadow-[0_12px_28px_-8px_rgba(0,0,0,0.9)]`}
         >
           <img
             src={getImageSrc(src)}
@@ -116,20 +136,23 @@ function SegmentCard({ href, icon: Icon, label, count, stats, accent, sealed }) 
         />
       </div>
 
-      <div className="relative z-10 min-w-0 pr-40">
-        <p className="text-2xl font-bold text-dark-50 whitespace-nowrap">
+      <div className="relative z-10 min-w-0 pr-28">
+        <Label>Valeur</Label>
+        <p className="text-2xl font-bold text-brand-primary whitespace-nowrap">
           {eur(stats.value)}
         </p>
-        <p className="text-sm text-dark-300 mt-0.5">
-          {eur(stats.invested)} investis
+
+        <Label className="mt-2">Investi</Label>
+        <p className="text-sm font-semibold text-dark-100 whitespace-nowrap">
+          {eur(stats.invested)}
         </p>
-        <div className="mt-1.5">
-          <Delta
-            value={stats.gain}
-            percentage={stats.gainPercentage}
-            className="text-sm"
-          />
-        </div>
+
+        <Label className="mt-2">{deltaLabel(stats.gain)}</Label>
+        <Delta
+          value={stats.gain}
+          percentage={stats.gainPercentage}
+          className="text-sm"
+        />
       </div>
 
       <PreviewStack images={stats.previews} sealed={sealed} />
@@ -166,10 +189,16 @@ export default async function DashboardPage() {
               <p className="font-semibold text-dark-50 leading-tight">
                 Portefeuille global
               </p>
-              <p className="text-xs text-dark-400">Valeur totale estimée</p>
+              <p className="text-xs text-dark-400">
+                {stats.totalItems} élément{stats.totalItems > 1 ? "s" : ""} en
+                collection
+              </p>
             </div>
           </div>
 
+          {/* Même libellé que sur les cartes de catégorie : le montant est
+              nommé, pas seulement mis en avant. */}
+          <Label>Valeur totale estimée</Label>
           <p className="text-3xl sm:text-4xl font-bold text-gradient-gold">
             {eur(stats.currentValue)}
           </p>
@@ -178,7 +207,7 @@ export default async function DashboardPage() {
               compare les montants sans changer d'échelle. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div className="surface rounded-2xl px-4 py-3">
-              <p className="text-sm text-dark-300 mb-1">Gain potentiel</p>
+              <Label className="mb-1">{deltaLabel(stats.potentialGain)}</Label>
               <Delta
                 value={stats.potentialGain}
                 percentage={stats.potentialPercentage}
@@ -188,7 +217,7 @@ export default async function DashboardPage() {
               />
             </div>
             <div className="surface rounded-2xl px-4 py-3">
-              <p className="text-sm text-dark-300 mb-1">Total investi</p>
+              <Label className="mb-1">Total investi</Label>
               <p className="text-xl sm:text-2xl font-bold text-dark-50 flex items-center gap-1.5 whitespace-nowrap">
                 <ShoppingCart size={20} className="text-dark-400 shrink-0" />
                 {eur(stats.totalInvested)}
@@ -249,17 +278,24 @@ export default async function DashboardPage() {
                 />
               </div>
 
-              <p className="text-2xl font-bold text-dark-50 whitespace-nowrap">
+              <Label>Encaissé</Label>
+              <p className="text-2xl font-bold text-brand-primary whitespace-nowrap">
                 {eur(stats.totalSold)}
               </p>
-              <p className="text-sm text-dark-300 mt-0.5">encaissés</p>
-              <div className="mt-1.5">
-                <Delta
-                  value={stats.totalRealized}
-                  percentage={stats.realizedPercentage}
-                  className="text-sm"
-                />
-              </div>
+
+              <Label className="mt-2">Coût d'achat</Label>
+              <p className="text-sm font-semibold text-dark-100 whitespace-nowrap">
+                {eur(stats.totalSold - stats.totalRealized)}
+              </p>
+
+              <Label className="mt-2">
+                {deltaLabel(stats.totalRealized, { realized: true })}
+              </Label>
+              <Delta
+                value={stats.totalRealized}
+                percentage={stats.realizedPercentage}
+                className="text-sm"
+              />
             </Link>
           </div>
         </div>
