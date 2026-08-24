@@ -1,4 +1,5 @@
 import { LANGUAGES, CONDITIONS } from "@/lib/categories";
+import { POKEMON_EN_TO_FR } from "@/lib/pokemonNames";
 
 // Identifiant pays Cardmarket (paramètre `sellerCountry`).
 export const SELLER_COUNTRIES = [
@@ -223,4 +224,105 @@ export function pickSuggestedPrice(cardmarket) {
   }
 
   return null;
+}
+
+
+/**
+ * Vocabulaire produit courant. Le nom d'une extension est traduit par la
+ * table officielle, mais les qualificatifs qui l'entourent restent anglais :
+ * ce glossaire les rend au français, du plus long au plus court pour que
+ * « Premium Collection » l'emporte sur « Collection » seul.
+ */
+const PRODUCT_GLOSSARY = [
+  [/\bFirst Partner Illustration Collection\b/gi, "Collection Illustration Premiers Partenaires"],
+  [/\bFirst Partner\b/gi, "Premiers Partenaires"],
+  [/\bPok[eé] ?Ball Tin\b/gi, "Pokébox"],
+  [/\bPremium Figure Collection\b/gi, "Collection Figurine Premium"],
+  [/\bSpecial Illustration Collection\b/gi, "Collection Illustration Spéciale"],
+  [/\bIllustration Collection\b/gi, "Collection Illustration"],
+  [/\bPremium Collection\b/gi, "Collection Premium"],
+  [/\bSpecial Collection\b/gi, "Collection Spéciale"],
+  [/\bBuild ?&? ?Battle Stadium\b/gi, "Stade de Tournoi"],
+  [/\bBuild ?&? ?Battle Box\b/gi, "Kit de Tournoi"],
+  [/\bEnhanced Booster Box\b/gi, "Display Renforcé"],
+  [/\bHalf Booster Box\b/gi, "Demi-Display"],
+  [/\bSleeved Booster\b/gi, "Booster sous Blister"],
+  [/\bCheck ?lane\b/gi, "Blister Caisse"],
+  [/\bMini Tin\b/gi, "Mini Pokébox"],
+  [/\bGift Box\b/gi, "Coffret Cadeau"],
+  [/\bBinder Collection\b/gi, "Collection Classeur"],
+  [/\bPin Collection\b/gi, "Collection Pin's"],
+  [/\bFigure Collection\b/gi, "Collection Figurine"],
+  [/\bSeries\b/gi, "Série"],
+  [/\bDeck\b/gi, "Deck"],
+];
+
+/**
+ * Mots décrivant le conditionnement : le type les remplace déjà.
+ * Frontières explicites plutôt que \b, une lettre accentuée n'étant pas
+ * un caractère de mot — « Pokébox » se ferait sinon amputer de sa fin.
+ */
+const PACKAGING_WORDS =
+  /(^|\s)(Booster Box|Elite Trainer Box|Booster Bundle|Booster Pack|Booster|Bundle|Box|Tin|Display)(?=\s|$)/gi;
+
+/** Glossaire, noms de Pokémon, puis retrait du conditionnement. */
+function translateVocabulary(text) {
+  let out = text;
+  for (const [pattern, french] of PRODUCT_GLOSSARY) out = out.replace(pattern, french);
+
+  // Un nom de Pokémon isolé : « Mega Charizard Y ex » -> « Mega Dracaufeu Y ex »
+  out = out.replace(/[A-Za-z][A-Za-z'.\u2019-]+/g, (word) =>
+    POKEMON_EN_TO_FR[word] ?? word
+  );
+
+  return out.replace(PACKAGING_WORDS, "$1").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Compose le nom français d'un produit scellé.
+ *
+ * Le catalogue TCGplayer ne fournit que de l'anglais (« Mega Evolution
+ * Booster Box ») : on isole l'extension pour la traduire, et on la préfixe
+ * du type dans la forme usuelle des collectionneurs francophones
+ * (« Display Méga-Évolution »).
+ */
+export function frenchSealedName(productName, type, enToFr) {
+  if (!productName) return productName;
+
+  // « Scarlet Violet » dans une URL désigne « Scarlet & Violet » au catalogue.
+  const normalize = (t) =>
+    t.toLowerCase().replace(/\s*&\s*/g, " ").replace(/\s+/g, " ").trim();
+
+  const enToFrNormalized = {};
+  for (const [en, fr] of Object.entries(enToFr || {})) {
+    enToFrNormalized[normalize(en)] = fr;
+  }
+
+  const words = productName.trim().split(/\s+/);
+
+  // Préfixe le plus long qui corresponde à une extension connue
+  for (let len = words.length; len >= 1; len--) {
+    const french = enToFrNormalized[normalize(words.slice(0, len).join(" "))];
+    if (!french) continue;
+
+    // Le glossaire agit avant le nettoyage : sans cela, retirer « Collection »
+    // empêcherait de reconnaître « Premium Figure Collection ».
+    const variant = translateVocabulary(words.slice(len).join(" "))
+      .replace(/\s+/g, " ")
+      .trim();
+
+    return [type, french, variant].filter(Boolean).join(" ");
+  }
+
+  // Produit hors extension identifiable : on traduit au moins le vocabulaire,
+  // le nom propre restant en l'état faute de source française.
+  const translated = translateVocabulary(productName);
+
+  // Préfixer « Coffret » devant « Collection… » serait redondant.
+  const alreadyTyped =
+    /^(coffret|collection|pokébox|mini pokébox|kit|stade|display|booster|bundle|etb|blister)\b/i.test(
+      translated
+    );
+
+  return type && !alreadyTyped ? `${type} ${translated}` : translated;
 }

@@ -16,6 +16,15 @@ const CACHE = {
   next: { revalidate: 86400 },
 };
 
+/**
+ * Groupes fourre-tout du catalogue : ils rassemblent les produits qui ne
+ * sont rattachés à aucune extension (coffins Mega Charizard, promotions
+ * diverses…). Leur nom n'ayant aucun mot commun avec les produits qu'ils
+ * contiennent, aucune correspondance ne peut les désigner : on les
+ * interroge donc systématiquement en complément.
+ */
+const CATCH_ALL_GROUPS = ["miscellaneous cards & products"];
+
 /** Retire le préfixe d'édition : « SV04: Paradox Rift » -> « Paradox Rift ». */
 export function cleanGroupName(name = "") {
   return name.replace(/^[A-Z]{1,6}\d{0,2}:\s*/, "").trim();
@@ -80,6 +89,8 @@ export function findGroup(productName, groups) {
   const target = normalize(productName);
   let best = null;
 
+  // Cas courant : le nom du produit s'ouvre sur celui de l'extension
+  // (« Silver Tempest Elite Trainer Box »). On retient le plus long.
   for (const group of groups) {
     const clean = normalize(cleanGroupName(group.name));
     if (!clean) continue;
@@ -87,6 +98,28 @@ export function findGroup(productName, groups) {
       if (!best || clean.length > normalize(cleanGroupName(best.name)).length) {
         best = group;
       }
+    }
+  }
+  if (best) return best;
+
+  // Sinon on compare les mots : « First Partner Illustration Collection
+  // Series 1 » appartient au groupe « First Partner Collection 2026 »,
+  // qu'aucun préfixe ne permettait de rapprocher.
+  const targetWords = new Set(tokens(productName));
+  let bestScore = 0;
+
+  for (const group of groups) {
+    const groupWords = tokens(cleanGroupName(group.name));
+    if (!groupWords.length) continue;
+
+    const common = groupWords.filter((w) => targetWords.has(w)).length;
+    // Proportion du groupe retrouvée dans le produit, pondérée par le nombre
+    // de mots communs : un groupe court et entièrement présent l'emporte.
+    const score = (common / groupWords.length) * common;
+
+    if (common >= 2 && score > bestScore) {
+      bestScore = score;
+      best = group;
     }
   }
 
@@ -107,20 +140,37 @@ export async function findSealedProduct(productName) {
   if (!productName) return null;
 
   const groups = await fetchGroups();
-  const group = findGroup(productName, groups);
-  if (!group) return null;
 
-  const products = await fetchProducts(group.groupId);
-  if (!products.length) return null;
+  // Groupe déduit du nom, plus les fourre-tout qu'aucun rapprochement
+  // ne peut désigner.
+  const candidates = [];
+  const matched = findGroup(productName, groups);
+  if (matched) candidates.push(matched);
+
+  for (const group of groups) {
+    if (CATCH_ALL_GROUPS.includes(group.name.toLowerCase()) && group !== matched) {
+      candidates.push(group);
+    }
+  }
+
+  if (!candidates.length) return null;
 
   let best = null;
   let bestScore = -Infinity;
+  let bestGroup = null;
 
-  for (const product of products) {
-    const score = similarity(productName, product.name);
-    if (score > bestScore) {
-      bestScore = score;
-      best = product;
+  for (const group of candidates) {
+    const products = await fetchProducts(group.groupId);
+    for (const product of products) {
+      // Les cartes-codes accompagnent le produit sans être le produit.
+      if (/^code card\b/i.test(product.name)) continue;
+
+      const score = similarity(productName, product.name);
+      if (score > bestScore) {
+        bestScore = score;
+        best = product;
+        bestGroup = group;
+      }
     }
   }
 
@@ -130,7 +180,7 @@ export async function findSealedProduct(productName) {
   // Prix TCGplayer, seule cotation accessible pour les scellés (en dollars).
   let priceUsd = null;
   try {
-    const prices = await fetchPrices(group.groupId);
+    const prices = await fetchPrices(bestGroup.groupId);
     const match = prices.find((p) => p.productId === best.productId);
     const value = match?.marketPrice ?? match?.midPrice ?? match?.lowPrice;
     if (typeof value === "number" && value > 0) priceUsd = value;
@@ -142,8 +192,8 @@ export async function findSealedProduct(productName) {
     name: best.name,
     imageUrl: highResImage(best.imageUrl),
     productId: best.productId,
-    groupId: group.groupId,
-    groupName: cleanGroupName(group.name),
+    groupId: bestGroup.groupId,
+    groupName: cleanGroupName(bestGroup.name),
     priceUsd,
     score: bestScore,
   };

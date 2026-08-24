@@ -5,8 +5,13 @@ import {
   splitSuffix,
   mapRarityToCategory,
   mapProductKindToType,
+  frenchSealedName,
 } from "@/lib/cardmarket";
-import { SET_CODE_TO_IDS, SET_NAME_TO_IDS } from "@/lib/pokemonSets";
+import {
+  SET_CODE_TO_IDS,
+  SET_NAME_TO_IDS,
+  SET_EN_TO_FR,
+} from "@/lib/pokemonSets";
 import { findSealedProduct } from "@/lib/tcgcsv";
 import { usdToEur } from "@/lib/currency";
 
@@ -121,6 +126,30 @@ async function findCards(setIds, { number, cardName }) {
   );
 }
 
+
+/**
+ * Illustration de repli : le logo de l'extension, quand le produit lui-même
+ * n'est pas au catalogue TCGplayer (sorties très récentes notamment).
+ */
+async function setLogoFor(productName) {
+  const words = productName.trim().split(/\s+/);
+
+  for (let len = words.length; len >= 1; len--) {
+    const englishKey = words.slice(0, len).join(" ").toLowerCase();
+    const french = SET_EN_TO_FR[englishKey];
+    const ids = french
+      ? SET_NAME_TO_IDS[french.toLowerCase()]
+      : SET_NAME_TO_IDS[englishKey];
+
+    if (!ids?.length) continue;
+
+    const set = await apiGet(`/sets/${ids[0]}`);
+    if (set?.logo) return `${set.logo}.png`;
+  }
+
+  return null;
+}
+
 export async function GET(req) {
   try {
     const session = await auth();
@@ -155,6 +184,19 @@ export async function GET(req) {
         console.error("Sealed product lookup failed:", e);
       }
 
+      // Le catalogue TCGplayer est anglophone : on rétablit le français,
+      // qui sert aussi de requête sur eBay et Vinted.
+      const name = frenchSealedName(
+        product?.name || parsed.productName,
+        type,
+        SET_EN_TO_FR
+      );
+
+      // Produit absent du catalogue : à défaut de photo, le logo de
+      // l'extension vaut mieux qu'un cadre vide.
+      const imageUrl =
+        product?.imageUrl || (await setLogoFor(parsed.productName));
+
       // Aucune cotation Cardmarket n'est accessible pour les scellés :
       // on convertit le prix TCGplayer, en l'annonçant clairement comme indicatif.
       let suggestedPrice = null;
@@ -172,22 +214,24 @@ export async function GET(req) {
 
       let message;
       if (product && suggestedPrice != null) {
-        message = `« ${product.name} » identifié comme ${type}. Photo récupérée et prix indicatif de ${suggestedPrice.toFixed(2)} € — converti du marché américain, à vérifier sur Cardmarket.`;
+        message = `« ${name} » identifié, photo récupérée et prix indicatif de ${suggestedPrice.toFixed(2)} € — converti du marché américain, à vérifier sur Cardmarket.`;
       } else if (product) {
-        message = `« ${product.name} » identifié comme ${type}, photo récupérée. Prix à saisir manuellement.`;
+        message = `« ${name} » identifié, photo récupérée. Prix à saisir manuellement.`;
+      } else if (imageUrl) {
+        message = `« ${name} » identifié. Produit absent du catalogue : logo de l'extension proposé, photo et prix à compléter.`;
       } else {
-        message = `Identifié comme « ${type} ». Photo et prix à compléter manuellement.`;
+        message = `« ${name} » identifié. Photo et prix à compléter manuellement.`;
       }
 
       return NextResponse.json({
         kind: "sealed",
-        name: product?.name || parsed.productName,
+        name,
         externalId:
           product?.groupId && product?.productId
             ? `${product.groupId}:${product.productId}`
             : null,
         type,
-        imageUrl: product?.imageUrl || null,
+        imageUrl,
         cardmarketUrl: parsed.href,
         suggestedPrice,
         priceSource,
