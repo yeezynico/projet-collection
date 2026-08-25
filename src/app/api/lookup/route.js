@@ -12,7 +12,11 @@ import {
   SET_NAME_TO_IDS,
   SET_EN_TO_FR,
 } from "@/lib/pokemonSets";
-import { findSealedProduct } from "@/lib/tcgcsv";
+import {
+  findSealedProduct,
+  fetchCardImageIndex,
+  normalizeCardNumber,
+} from "@/lib/tcgcsv";
 import { usdToEur } from "@/lib/currency";
 
 // TCGdex fournit les données en français et des prix Cardmarket quotidiens.
@@ -275,6 +279,24 @@ export async function GET(req) {
     }
 
     const results = cards.map((c) => serializeCard(c, parsed.href));
+
+    // Fiche publiée sans visuel : on va chercher l'illustration ailleurs
+    // plutôt que de laisser la carte sans photo.
+    if (results.some((r) => !r.imageUrl)) {
+      let index = null;
+      try {
+        index = await fetchCardImageIndex(setCode, parsed.setName);
+      } catch (e) {
+        console.error("Card image fallback failed:", e);
+      }
+
+      if (index) {
+        for (const result of results) {
+          if (result.imageUrl || !result.number) continue;
+          result.imageUrl = index.get(normalizeCardNumber(result.number)) || null;
+        }
+      }
+    }
 
     // On renvoie toujours les candidats : avec un seul résultat cela permet
     // d'afficher l'aperçu, avec plusieurs de choisir la bonne version.

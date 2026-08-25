@@ -133,6 +133,84 @@ export function highResImage(imageUrl) {
 }
 
 /**
+ * Forme commune d'un numéro de carte.
+ *
+ * Les extensions ordinaires le donnent sur le total de la série
+ * (« 138/195 ») et les promotions seules (« 024 »), avec ou sans zéros
+ * initiaux : « 008/195 », « 8 » et « 008 » désignent la même carte.
+ */
+export function normalizeCardNumber(value) {
+  return String(value).split("/")[0].trim().replace(/^0+(?=.)/, "");
+}
+
+/**
+ * Extension du catalogue portant ce nom, aux variantes de graphie près
+ * (« Astral Radiance » / « SWSH10: Astral Radiance »).
+ */
+function findGroupByName(setName, groups) {
+  const target = normalize(setName || "");
+  if (!target) return null;
+
+  const exact = groups.find((g) => normalize(cleanGroupName(g.name)) === target);
+  if (exact) return exact;
+
+  // Sinon, le groupe qui partage le plus de mots avec le nom recherché,
+  // à condition d'en retrouver la totalité.
+  const words = tokens(setName);
+  let best = null;
+  let bestScore = 0;
+
+  for (const group of groups) {
+    const groupWords = tokens(cleanGroupName(group.name));
+    if (!groupWords.length) continue;
+
+    const common = groupWords.filter((w) => words.includes(w)).length;
+    if (common !== groupWords.length) continue;
+
+    if (common > bestScore) {
+      bestScore = common;
+      best = group;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Index « numéro de carte -> illustration » pour une extension.
+ *
+ * TCGdex publie parfois la fiche d'une carte avant son visuel — c'est courant
+ * sur les promotions récentes. Le catalogue TCGplayer prend alors le relais :
+ * son abréviation de groupe reprend le code d'extension de Cardmarket, et
+ * chaque produit porte son numéro de carte.
+ */
+export async function fetchCardImageIndex(setCode, setName) {
+  if (!setCode && !setName) return null;
+
+  const groups = await fetchGroups();
+  const code = (setCode || "").toLowerCase();
+
+  // L'abréviation est le repère le plus sûr quand elle existe ; un tiers
+  // seulement des extensions en portent une, d'où le repli sur le nom.
+  const group =
+    (code && groups.find((g) => (g.abbreviation || "").toLowerCase() === code)) ||
+    findGroupByName(setName, groups);
+
+  if (!group) return null;
+
+  const products = await fetchProducts(group.groupId);
+  const index = new Map();
+
+  for (const product of products) {
+    const number = product.extendedData?.find((e) => e.name === "Number")?.value;
+    if (!number || !product.imageUrl) continue;
+    index.set(normalizeCardNumber(number), highResImage(product.imageUrl));
+  }
+
+  return index.size ? index : null;
+}
+
+/**
  * Retrouve la photo d'un produit scellé à partir de son nom Cardmarket.
  * Renvoie null si aucune correspondance convaincante n'est trouvée.
  */
