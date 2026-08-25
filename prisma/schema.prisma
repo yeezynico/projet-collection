@@ -175,6 +175,19 @@ model Sale {
 
   itemName String
 
+  // Caractéristiques recopiées depuis la collection au moment de la vente :
+  // l'article vendu en sort, ses informations doivent survivre à sa
+  // suppression pour rester consultables dans l'historique.
+  itemNumber String?
+
+  extension String?
+
+  language String?
+
+  condition String?
+
+  cardmarketUrl String?
+
   quantity Int @default(1)
 
   purchasePrice Float

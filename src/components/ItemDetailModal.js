@@ -52,8 +52,11 @@ function MarketRow({ href, logo, name, subtitle }) {
  * Fiche détaillée d'une carte ou d'un produit scellé.
  * Illustration et caractéristiques en haut, valeur mise en avant,
  * puis comparaison des places de marché.
+ *
+ * `sale` bascule les intitulés vers le passé : l'article a quitté la
+ * collection, le montant affiché est celui auquel il est parti.
  */
-export default function ItemDetailModal({ item, kind = "card", onClose }) {
+export default function ItemDetailModal({ item, kind = "card", sale = false, onClose }) {
   useModalDismiss(onClose, !!item);
 
   if (!item) return null;
@@ -164,8 +167,12 @@ export default function ItemDetailModal({ item, kind = "card", onClose }) {
                 )}
               </Spec>
 
-              <Spec label="Quantité">{item.quantity}</Spec>
-              <Spec label="Acheté le">{purchaseDate || "—"}</Spec>
+              <Spec label={sale ? "Quantité vendue" : "Quantité"}>
+                {item.quantity}
+              </Spec>
+              <Spec label={sale ? "Vendu le" : "Acheté le"}>
+                {purchaseDate || "—"}
+              </Spec>
             </div>
           </div>
         </div>
@@ -188,7 +195,7 @@ export default function ItemDetailModal({ item, kind = "card", onClose }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="surface-gold rounded-2xl px-4 py-4 text-center">
               <p className="text-[11px] uppercase tracking-wider text-dark-500">
-                Estimation
+                {sale ? "Prix de vente" : "Estimation"}
               </p>
               <p className="text-3xl font-bold text-gradient-gold mt-1">
                 {currentPrice.toFixed(2)} €
@@ -214,7 +221,7 @@ export default function ItemDetailModal({ item, kind = "card", onClose }) {
               }`}
             >
               <p className="text-[11px] uppercase tracking-wider text-dark-500">
-                Gain
+                {sale ? "Gain réalisé" : "Gain"}
               </p>
               <p
                 className={`text-3xl font-bold mt-1 ${

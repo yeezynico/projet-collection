@@ -36,6 +36,10 @@ export async function PUT(req, { params }) {
         salePrice,
         gain,
         percentage,
+        // Les ventes enregistrées avant l'ajout de ces champs peuvent être
+        // complétées ; une clé absente laisse la valeur en place.
+        language: data.language === undefined ? undefined : data.language || null,
+        condition: data.condition === undefined ? undefined : data.condition || null,
         saleDate: data.saleDate ? new Date(data.saleDate) : undefined,
       },
     });

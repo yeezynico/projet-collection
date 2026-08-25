@@ -6,7 +6,13 @@ import { useSession } from "next-auth/react";
 import { ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus, Link2, Loader2 } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
-import { CARD_CATEGORIES, SEALED_TYPES } from "@/lib/categories";
+import {
+  CARD_CATEGORIES,
+  SEALED_TYPES,
+  LANGUAGES,
+  getLanguage,
+} from "@/lib/categories";
+import ItemDetailModal from "@/components/ItemDetailModal";
 
 const TYPE_LABELS = {
   card: "Carte",
@@ -240,6 +246,10 @@ export default function SalesPage() {
     itemName: "",
     itemType: "card",
     itemCategory: "",
+    language: "",
+    itemNumber: "",
+    extension: "",
+    cardmarketUrl: "",
     quantity: "1",
     purchasePrice: "",
     salePrice: "",
@@ -247,7 +257,9 @@ export default function SalesPage() {
     imageUrl: "",
   });
   const [editingSale, setEditingSale] = useState(null);
+  const [detailSale, setDetailSale] = useState(null);
   const [editData, setEditData] = useState({
+    language: "",
     quantity: "1",
     purchasePrice: "",
     salePrice: "",
@@ -326,6 +338,11 @@ export default function SalesPage() {
       itemType: data.kind === "sealed" ? "sealed" : "card",
       itemCategory: data.category || data.type || prev.itemCategory,
       imageUrl: data.imageUrl || prev.imageUrl,
+      // Numéro, extension et lien alimentent la fiche de l'article vendu :
+      // sans eux, la recherche eBay ramènerait toutes les versions.
+      itemNumber: data.number || prev.itemNumber,
+      extension: data.extension || prev.extension,
+      cardmarketUrl: data.cardmarketUrl || prev.cardmarketUrl,
     }));
   }
 
@@ -369,6 +386,10 @@ export default function SalesPage() {
       itemName: "",
       itemType: "card",
       itemCategory: "",
+      language: "",
+      itemNumber: "",
+      extension: "",
+      cardmarketUrl: "",
       quantity: "1",
       purchasePrice: "",
       salePrice: "",
@@ -411,6 +432,7 @@ export default function SalesPage() {
   function openEditModal(sale) {
     setEditingSale(sale);
     setEditData({
+      language: sale.language || "",
       quantity: sale.quantity.toString(),
       purchasePrice: sale.purchasePrice.toString(),
       salePrice: sale.salePrice.toString(),
@@ -432,7 +454,16 @@ export default function SalesPage() {
     setSales((prev) =>
       prev.map((s) =>
         s.id === editingSale.id
-          ? { ...s, quantity, purchasePrice, salePrice, gain, percentage, saleDate: editData.saleDate }
+          ? {
+              ...s,
+              quantity,
+              purchasePrice,
+              salePrice,
+              gain,
+              percentage,
+              language: editData.language || null,
+              saleDate: editData.saleDate,
+            }
           : s
       )
     );
@@ -442,7 +473,13 @@ export default function SalesPage() {
       const res = await fetch(`/api/sales/${editingSale.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ quantity, purchasePrice, salePrice, saleDate: editData.saleDate }),
+        body: JSON.stringify({
+          quantity,
+          purchasePrice,
+          salePrice,
+          language: editData.language,
+          saleDate: editData.saleDate,
+        }),
       });
       if (!res.ok) setSales(previous);
     } catch (error) {
@@ -732,6 +769,7 @@ export default function SalesPage() {
                 <tr>
                   <th className="px-4 py-2.5 text-left font-semibold text-dark-200">Nom</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-dark-200">Type</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-dark-200">Langue</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-dark-200">Qté</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-dark-200">Achat</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-dark-200">Vente</th>
@@ -746,12 +784,18 @@ export default function SalesPage() {
                   <tr key={sale.id} className="hover:bg-dark-700/50 transition">
                     <td className="px-4 py-2 text-dark-50">
                       <div className="flex items-center gap-2.5">
-                        {/* Miniature de l'article : on reconnaît d'un coup d'œil
-                            ce qui a été vendu, le survol l'agrandit. */}
-                        <div
+                        {/* Miniature de l'article : le survol l'agrandit,
+                            le clic ouvre la fiche et les places de marché. */}
+                        <button
+                          type="button"
                           onMouseEnter={(e) => showPreview(e, sale)}
                           onMouseLeave={hidePreview}
-                          className="w-9 h-12 rounded-md overflow-hidden bg-dark-950 ring-1 ring-white/8 shrink-0 hover:ring-brand-primary/50 transition"
+                          onClick={() => {
+                            hidePreview();
+                            setDetailSale(sale);
+                          }}
+                          title="Voir la fiche et comparer les prix"
+                          className="w-9 h-12 rounded-md overflow-hidden bg-dark-950 ring-1 ring-white/8 shrink-0 hover:ring-brand-primary/50 transition cursor-pointer"
                         >
                           {sale.imageUrl ? (
                             <img
@@ -768,7 +812,7 @@ export default function SalesPage() {
                               <ImageOff size={14} />
                             </span>
                           )}
-                        </div>
+                        </button>
                         <span className="line-clamp-2">{sale.itemName}</span>
                       </div>
                     </td>
@@ -776,6 +820,21 @@ export default function SalesPage() {
                       {TYPE_LABELS[sale.itemType] || sale.itemType}
                       {sale.itemCategory && (
                         <span className="text-dark-500"> · {sale.itemCategory}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2">
+                      {getLanguage(sale.language) ? (
+                        <span
+                          title={getLanguage(sale.language).label}
+                          className="flex items-center gap-1.5 text-dark-300 whitespace-nowrap"
+                        >
+                          <span className="text-base leading-none">
+                            {getLanguage(sale.language).flag}
+                          </span>
+                          {getLanguage(sale.language).value}
+                        </span>
+                      ) : (
+                        <span className="text-dark-600">—</span>
                       )}
                     </td>
                     <td className="px-4 py-2 text-dark-50">{sale.quantity}</td>
@@ -980,6 +1039,24 @@ export default function SalesPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Langue
+                </label>
+                <select
+                  value={addData.language}
+                  onChange={(e) => setAddData({ ...addData, language: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                >
+                  <option value="">Non précisée</option>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.flag} {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-dark-200 mb-2">
@@ -1146,6 +1223,24 @@ export default function SalesPage() {
 
               <div>
                 <label className="block text-sm font-medium text-dark-200 mb-2">
+                  Langue
+                </label>
+                <select
+                  value={editData.language}
+                  onChange={(e) => setEditData({ ...editData, language: e.target.value })}
+                  className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                >
+                  <option value="">Non précisée</option>
+                  {LANGUAGES.map((lang) => (
+                    <option key={lang.value} value={lang.value}>
+                      {lang.flag} {lang.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-dark-200 mb-2">
                   Date de vente
                 </label>
                 <input
@@ -1173,6 +1268,33 @@ export default function SalesPage() {
               </div>
             </form>
           </Modal>
+        )}
+
+        {/* Fiche de l'article vendu : les caractéristiques recopiées lors de
+            la vente permettent d'interroger les places de marché. */}
+        {detailSale && (
+          <ItemDetailModal
+            sale
+            kind={detailSale.itemType}
+            onClose={() => setDetailSale(null)}
+            item={{
+              name: detailSale.itemName,
+              number: detailSale.itemNumber,
+              extension: detailSale.extension,
+              category: detailSale.itemCategory,
+              type: detailSale.itemCategory,
+              language: detailSale.language,
+              condition: detailSale.condition,
+              cardmarketUrl: detailSale.cardmarketUrl,
+              imageUrl: detailSale.imageUrl,
+              quantity: detailSale.quantity,
+              purchasePrice: detailSale.purchasePrice,
+              // La fiche met en avant « currentPrice » : pour une vente,
+              // c'est le montant auquel l'article est parti.
+              currentPrice: detailSale.salePrice,
+              purchaseDate: detailSale.saleDate,
+            }}
+          />
         )}
       </div>
     </DashboardLayout>
