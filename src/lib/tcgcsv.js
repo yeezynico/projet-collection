@@ -4,6 +4,8 @@
  * de la base de cartes Pokémon TCG.
  */
 
+import { TCGDEX_TO_TCGPLAYER_GROUP } from "@/lib/tcgplayerGroups";
+
 const BASE = "https://tcgcsv.com/tcgplayer";
 const POKEMON_CATEGORY = 3;
 
@@ -177,6 +179,27 @@ function findGroupByName(setName, groups) {
 }
 
 /**
+ * Groupe du catalogue correspondant à une extension.
+ *
+ * La table couvre l'essentiel ; l'abréviation puis le nom servent de recours
+ * pour les extensions parues depuis sa génération.
+ */
+async function resolveGroupId(setId, setCode, setName) {
+  const known = TCGDEX_TO_TCGPLAYER_GROUP[setId];
+  if (known) return known;
+
+  if (!setCode && !setName) return null;
+
+  const groups = await fetchGroups();
+  const code = (setCode || "").toLowerCase();
+  const group =
+    (code && groups.find((g) => (g.abbreviation || "").toLowerCase() === code)) ||
+    findGroupByName(setName, groups);
+
+  return group?.groupId || null;
+}
+
+/**
  * Index « numéro de carte -> illustration » pour une extension.
  *
  * TCGdex publie parfois la fiche d'une carte avant son visuel — c'est courant
@@ -184,30 +207,61 @@ function findGroupByName(setName, groups) {
  * son abréviation de groupe reprend le code d'extension de Cardmarket, et
  * chaque produit porte son numéro de carte.
  */
-export async function fetchCardImageIndex(setCode, setName) {
-  if (!setCode && !setName) return null;
+export async function fetchCardImageIndex(setId, { setCode, setName } = {}) {
+  const groupId = await resolveGroupId(setId, setCode, setName);
+  if (!groupId) return null;
 
-  const groups = await fetchGroups();
-  const code = (setCode || "").toLowerCase();
-
-  // L'abréviation est le repère le plus sûr quand elle existe ; un tiers
-  // seulement des extensions en portent une, d'où le repli sur le nom.
-  const group =
-    (code && groups.find((g) => (g.abbreviation || "").toLowerCase() === code)) ||
-    findGroupByName(setName, groups);
-
-  if (!group) return null;
-
-  const products = await fetchProducts(group.groupId);
-  const index = new Map();
+  const products = await fetchProducts(groupId);
+  const byNumber = new Map();
+  const byName = new Map();
 
   for (const product of products) {
+    if (!product.imageUrl) continue;
+    const image = highResImage(product.imageUrl);
+
     const number = product.extendedData?.find((e) => e.name === "Number")?.value;
-    if (!number || !product.imageUrl) continue;
-    index.set(normalizeCardNumber(number), highResImage(product.imageUrl));
+    if (number) byNumber.set(normalizeCardNumber(number), image);
+
+    // Le nom sert de recours : dans les rééditions, TCGplayer conserve le
+    // numéro d'origine de la carte (« 4/102 » pour le Dracaufeu de la
+    // Collection Classique, que TCGdex numérote « CC002 »). Seul le nom
+    // relie alors les deux catalogues.
+    const key = productNameKey(product.name);
+    if (key && !byName.has(key)) byName.set(key, image);
   }
 
-  return index.size ? index : null;
+  return byNumber.size || byName.size ? { byNumber, byName } : null;
+}
+
+/**
+ * Nom d'une carte, dépouillé de ce que TCGplayer lui accole : le numéro
+ * (« Lugia V - SWSH301 ») et les qualificatifs entre parenthèses
+ * (« Donphan (Prime) »).
+ */
+export function productNameKey(name) {
+  return normalize(String(name || "").split(" - ")[0].replace(/\([^)]*\)/g, ""));
+}
+
+/**
+ * Illustration correspondant à un nom anglais.
+ *
+ * L'égalité stricte d'abord ; à défaut, un préfixe unique, ce qui rattrape
+ * les mentions que TCGplayer ajoute au nom (« Umbreon Star » pour la carte
+ * que TCGdex nomme « Umbreon ☆ »). L'unicité est exigée : deux candidats
+ * signifient qu'on ne sait pas laquelle est la bonne, et une photo erronée
+ * vaut moins que pas de photo.
+ */
+export function findImageByName(index, englishName) {
+  const key = productNameKey(englishName);
+  if (!key || !index?.byName) return null;
+
+  const exact = index.byName.get(key);
+  if (exact) return exact;
+
+  const prefixed = [...index.byName.keys()].filter((k) =>
+    k.startsWith(`${key} `)
+  );
+  return prefixed.length === 1 ? index.byName.get(prefixed[0]) : null;
 }
 
 /**

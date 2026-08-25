@@ -33,7 +33,9 @@ const emptyForm = {
   language: "FR",
   condition: "",
   quantity: "1",
-  purchasePrice: "",
+  // Une carte reçue ou échangée n'a rien coûté : zéro est la valeur juste
+  // le plus souvent, et elle évite d'avoir à effacer un champ vide obligatoire.
+  purchasePrice: "0",
   currentPrice: "",
   priceSource: "",
   priceUpdatedAt: "",

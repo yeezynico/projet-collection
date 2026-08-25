@@ -16,37 +16,33 @@ import {
   findSealedProduct,
   fetchCardImageIndex,
   normalizeCardNumber,
+  findImageByName,
 } from "@/lib/tcgcsv";
 import { usdToEur } from "@/lib/currency";
+import {
+  apiGet,
+  setIdOf,
+  setCodeFor,
+  fetchEnglishNames,
+} from "@/lib/tcgdex";
+import {
+  resolveCardmarketUrl,
+  buildCardmarketUrl,
+} from "@/lib/cardmarketLink";
 
-// TCGdex fournit les données en français et des prix Cardmarket quotidiens.
-const API_BASE = "https://api.tcgdex.net/v2/fr";
-
-/** Petite tolérance aux erreurs réseau transitoires. */
-async function apiGet(path, attempts = 3) {
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const res = await fetch(`${API_BASE}${path}`, {
-        next: { revalidate: 3600 },
-      });
-      if (res.ok) return await res.json();
-      if (res.status === 404) return null;
-    } catch {
-      // on retente
-    }
-    if (i < attempts - 1) {
-      await new Promise((r) => setTimeout(r, 300 * (i + 1)));
-    }
-  }
-  return null;
-}
 
 function findSetIds({ setCode, setName }) {
   if (setCode && SET_CODE_TO_IDS[setCode]) return SET_CODE_TO_IDS[setCode];
-  if (setName && SET_NAME_TO_IDS[setName.toLowerCase()]) {
-    return SET_NAME_TO_IDS[setName.toLowerCase()];
-  }
-  return [];
+  if (!setName) return [];
+
+  const key = setName.toLowerCase();
+  if (SET_NAME_TO_IDS[key]) return SET_NAME_TO_IDS[key];
+
+  // Quelques extensions — Célébrations en tête — ont une adresse Cardmarket
+  // dépourvue de code : « /Singles/Celebrations/Lugia ». Le nom anglais du
+  // lien est alors le seul repère, et la table est indexée en français.
+  const french = SET_EN_TO_FR[key];
+  return (french && SET_NAME_TO_IDS[french.toLowerCase()]) || [];
 }
 
 /** Prix de référence, en privilégiant la tendance Cardmarket. */
@@ -106,17 +102,30 @@ async function findCards(setIds, { number, cardName }) {
 
   if (!cardName) return [];
 
-  // Le nom du lien Cardmarket est en anglais : on compare sur les numéros
-  // du set, en récupérant la fiche complète des candidats plausibles.
+  // Le nom du lien Cardmarket est en anglais : on interroge donc les deux
+  // langues. « Charizard » ne ressemble en rien à « Dracaufeu », et sans le
+  // catalogue anglais aucun rapprochement ne serait possible.
   const found = [];
-  for (const setId of setIds) {
-    const set = await apiGet(`/sets/${setId}`);
-    if (!set?.cards) continue;
+  const needle = cardName.toLowerCase().replace(/[^a-z0-9]/g, "");
 
-    const needle = cardName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const matches = set.cards.filter((c) => {
+  for (const setId of setIds) {
+    const [fr, en] = await Promise.all([
+      apiGet(`/sets/${setId}`),
+      apiGet(`/sets/${setId}`, { locale: "en" }),
+    ]);
+
+    const catalogue = [...(fr?.cards || []), ...(en?.cards || [])];
+    if (!catalogue.length) continue;
+
+    const seen = new Set();
+    const matches = catalogue.filter((c) => {
       const n = (c.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-      return n.includes(needle) || needle.includes(n);
+      if (!n.includes(needle) && !needle.includes(n)) return false;
+      // Les deux catalogues partagent les identifiants : on ne retient
+      // chaque carte qu'une fois, quelle que soit la langue qui l'a trouvée.
+      if (seen.has(c.id)) return false;
+      seen.add(c.id);
+      return true;
     });
 
     for (const m of matches.slice(0, 12)) {
@@ -154,6 +163,45 @@ async function setLogoFor(productName) {
   return null;
 }
 
+/**
+ * Complète les fiches dépourvues d'illustration.
+ * TCGdex publie parfois la carte avant son visuel : le catalogue TCGplayer
+ * prend alors le relais.
+ */
+async function fillMissingImages(results, { setId, setCode, setName }) {
+  if (!results.some((r) => !r.imageUrl)) return;
+
+  let index = null;
+  try {
+    index = await fetchCardImageIndex(setId, { setCode, setName });
+  } catch (e) {
+    console.error("Card image fallback failed:", e);
+  }
+  if (!index) return;
+
+  // Le rapprochement par nom exige la forme anglaise, seule comparable au
+  // catalogue TCGplayer : on ne la charge que si le numéro a échoué.
+  let englishNames = null;
+
+  for (const result of results) {
+    if (result.imageUrl) continue;
+
+    const byNumber =
+      result.number && index.byNumber.get(normalizeCardNumber(result.number));
+    if (byNumber) {
+      result.imageUrl = byNumber;
+      continue;
+    }
+
+    if (!englishNames && setId) {
+      englishNames = await fetchEnglishNames(setId).catch(() => new Map());
+    }
+
+    const english = englishNames?.get(result.id);
+    result.imageUrl = (english && findImageByName(index, english)) || null;
+  }
+}
+
 export async function GET(req) {
   try {
     const session = await auth();
@@ -162,7 +210,60 @@ export async function GET(req) {
     }
 
     const { searchParams } = new URL(req.url);
+    const cardId = searchParams.get("id");
     const rawUrl = searchParams.get("url");
+
+    // Carte choisie dans la recherche intégrée : elle est déjà identifiée,
+    // il ne reste qu'à charger sa fiche complète.
+    if (cardId) {
+      const card = await apiGet(`/cards/${encodeURIComponent(cardId)}`);
+
+      if (!card?.id) {
+        return NextResponse.json({ error: "Carte introuvable" }, { status: 404 });
+      }
+
+      const result = serializeCard(card, null);
+
+      // Photo et lien Cardmarket sont indépendants : on les cherche ensemble.
+      const [, known] = await Promise.all([
+        fillMissingImages([result], {
+          setId: setIdOf(card.id),
+          setCode: setCodeFor(setIdOf(card.id)),
+          setName: card.set?.name,
+        }),
+        resolveCardmarketUrl(card.id, card.localId),
+      ]);
+
+      // Sans correspondance connue, l'adresse est composée à partir des noms
+      // anglais. Elle est juste dans la plupart des cas et l'alternative est
+      // de n'avoir aucun lien — mais elle est annoncée comme approximative.
+      let cardmarketUrl = known;
+      let cardmarketUrlGuessed = false;
+
+      if (!cardmarketUrl) {
+        const en = await apiGet(`/cards/${encodeURIComponent(cardId)}`, {
+          locale: "en",
+        });
+
+        if (en?.name) {
+          cardmarketUrl = buildCardmarketUrl({
+            cardName: en.name,
+            setName: en.set?.name,
+            setId: en.set?.id,
+            localId: en.localId,
+          });
+          cardmarketUrlGuessed = Boolean(cardmarketUrl);
+        }
+      }
+
+      return NextResponse.json({
+        kind: "card",
+        multiple: false,
+        ...result,
+        cardmarketUrl,
+        cardmarketUrlGuessed,
+      });
+    }
 
     if (!rawUrl) {
       return NextResponse.json({ error: "URL manquante" }, { status: 400 });
@@ -280,23 +381,11 @@ export async function GET(req) {
 
     const results = cards.map((c) => serializeCard(c, parsed.href));
 
-    // Fiche publiée sans visuel : on va chercher l'illustration ailleurs
-    // plutôt que de laisser la carte sans photo.
-    if (results.some((r) => !r.imageUrl)) {
-      let index = null;
-      try {
-        index = await fetchCardImageIndex(setCode, parsed.setName);
-      } catch (e) {
-        console.error("Card image fallback failed:", e);
-      }
-
-      if (index) {
-        for (const result of results) {
-          if (result.imageUrl || !result.number) continue;
-          result.imageUrl = index.get(normalizeCardNumber(result.number)) || null;
-        }
-      }
-    }
+    await fillMissingImages(results, {
+      setId: setIdOf(cards[0]?.id),
+      setCode,
+      setName: parsed.setName,
+    });
 
     // On renvoie toujours les candidats : avec un seul résultat cela permet
     // d'afficher l'aperçu, avec plusieurs de choisir la bonne version.

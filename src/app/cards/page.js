@@ -35,7 +35,9 @@ const emptyForm = {
   language: "FR",
   condition: "NM",
   quantity: "1",
-  purchasePrice: "",
+  // Une carte reçue ou échangée n'a rien coûté : zéro est la valeur juste
+  // le plus souvent, et elle évite d'avoir à effacer un champ vide obligatoire.
+  purchasePrice: "0",
   currentPrice: "",
   priceSource: "",
   priceUpdatedAt: "",
@@ -72,6 +74,11 @@ export default function CardsPage() {
   const [lookupError, setLookupError] = useState("");
   const [lookupInfo, setLookupInfo] = useState("");
   const [lookupCandidates, setLookupCandidates] = useState([]);
+  const [nameQuery, setNameQuery] = useState("");
+  const [nameResults, setNameResults] = useState([]);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [nameError, setNameError] = useState("");
+  const [nameTotal, setNameTotal] = useState(0);
 
   function toggleIn(setter) {
     return (value) =>
@@ -104,11 +111,73 @@ export default function CardsPage() {
       priceUpdatedAt: c.priceUpdatedAt || "",
     }));
 
-    setLookupInfo(
+    const base =
       c.suggestedPrice != null
         ? `${c.name} n°${c.number} — prix indicatif ${c.suggestedPrice.toFixed(2)} € (${c.priceSource}, maj ${c.priceUpdatedAt}). Moyenne européenne toutes langues : vérifiez sur Cardmarket.`
-        : `${c.name} n°${c.number} récupérée. Aucun prix de référence, saisissez-le manuellement.`
+        : `${c.name} n°${c.number} récupérée. Aucun prix de référence, saisissez-le manuellement.`;
+
+    // Cette carte n'a pas de correspondance connue : son lien a été composé
+    // et peut tomber à côté. Mieux vaut le dire que le laisser croire exact.
+    setLookupInfo(
+      c.cardmarketUrlGuessed
+        ? `${base} Le lien Cardmarket est reconstitué : vérifiez qu'il ouvre bien la bonne fiche.`
+        : base
     );
+  }
+
+  /** Cherche une carte par son nom français, sans passer par Cardmarket. */
+  async function searchByName() {
+    const query = nameQuery.trim();
+    if (query.length < 2) return;
+
+    setNameLoading(true);
+    setNameError("");
+    setLookupInfo("");
+    setNameResults([]);
+
+    try {
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setNameError(data.error || "Recherche impossible");
+        return;
+      }
+
+      setNameResults(data.results);
+      setNameTotal(data.total || data.results.length);
+
+      if (!data.results.length) {
+        setNameError(`Aucune carte ne correspond à « ${query} ».`);
+      }
+    } catch {
+      setNameError("Erreur réseau lors de la recherche");
+    } finally {
+      setNameLoading(false);
+    }
+  }
+
+  /** Charge la fiche complète de la carte choisie et remplit le formulaire. */
+  async function pickSearchResult(card) {
+    setNameError("");
+    setLookupCandidates([]);
+
+    try {
+      const res = await fetch(`/api/lookup?id=${encodeURIComponent(card.id)}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setNameError(data.error || "Chargement impossible");
+        return;
+      }
+
+      applyCandidate(data);
+      // La grille disparaît : le formulaire rempli devient le sujet.
+      setNameResults([]);
+      setNameQuery("");
+    } catch {
+      setNameError("Erreur réseau lors du chargement de la carte");
+    }
   }
 
   /** Remplit le formulaire à partir d'un lien Cardmarket. */
@@ -379,6 +448,93 @@ export default function CardsPage() {
             <h2 className="text-xl font-semibold text-dark-50 mb-4">
               Ajouter une nouvelle carte
             </h2>
+
+            {/* Recherche par nom : le chemin ordinaire, sans quitter l'app. */}
+            <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                <Search size={16} className="text-brand-primary" />
+                Rechercher une carte par son nom
+              </label>
+
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={nameQuery}
+                  onChange={(e) => setNameQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      searchByName();
+                    }
+                  }}
+                  placeholder="Lugia, Dracaufeu, Pikachu..."
+                  className="flex-1 min-w-64 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={searchByName}
+                  disabled={nameLoading || nameQuery.trim().length < 2}
+                  className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {nameLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recherche...
+                    </>
+                  ) : (
+                    "Chercher"
+                  )}
+                </button>
+              </div>
+
+              {nameError && <p className="text-sm text-red-400">{nameError}</p>}
+
+              {nameResults.length > 0 && (
+                <>
+                  <p className="text-xs text-dark-400">
+                    {nameTotal} carte{nameTotal > 1 ? "s" : ""} trouvée
+                    {nameTotal > 1 ? "s" : ""}
+                    {nameTotal > nameResults.length &&
+                      ` · ${nameResults.length} affichées, précisez le nom pour affiner`}
+                    . Cliquez sur la vôtre.
+                  </p>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-6 gap-2 max-h-96 overflow-y-auto">
+                    {nameResults.map((card) => (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => pickSearchResult(card)}
+                        title={`${card.name} · ${card.setName} · n°${card.number}`}
+                        className="surface surface-hover rounded-lg overflow-hidden text-left transition"
+                      >
+                        <span className="block aspect-3/4 bg-dark-950">
+                          {card.imageUrl ? (
+                            <img
+                              src={getImageSrc(card.imageUrl)}
+                              alt={card.name}
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="flex items-center justify-center w-full h-full text-dark-600">
+                              <ImageOff size={20} />
+                            </span>
+                          )}
+                        </span>
+                        <span className="block px-1.5 py-1">
+                          <span className="block text-[11px] font-semibold text-dark-100 truncate">
+                            {card.name}
+                          </span>
+                          <span className="block text-[10px] text-dark-500 truncate">
+                            {card.setName} · {card.number}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Remplissage automatique depuis un lien Cardmarket */}
             <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">
