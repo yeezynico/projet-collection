@@ -246,11 +246,16 @@ export async function GET(req) {
         });
 
         if (en?.name) {
+          // Les cartes de l'extension servent à situer les homonymes, dont
+          // dépend le marqueur de variante.
+          const enSet = await apiGet(`/sets/${en.set?.id}`, { locale: "en" });
+
           cardmarketUrl = buildCardmarketUrl({
             cardName: en.name,
             setName: en.set?.name,
             setId: en.set?.id,
             localId: en.localId,
+            setCards: enSet?.cards,
           });
           cardmarketUrlGuessed = Boolean(cardmarketUrl);
         }

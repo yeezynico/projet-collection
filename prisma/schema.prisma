@@ -25,9 +25,10 @@ model User {
   sessions Session[]
 
   // Application Pokémon
-  cards  Card[]
-  sealed SealedProduct[]
-  sales  Sale[]
+  cards   Card[]
+  sealed  SealedProduct[]
+  sales   Sale[]
+  watched WatchedCard[]
 
   createdAt DateTime @default(now())
 }
@@ -155,6 +156,52 @@ model SealedProduct {
   cardmarketUrl String?
 
   purchaseDate DateTime
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////
+// CARTES SUIVIES
+//////////////////////
+
+/// Carte que l'on surveille sans la posséder.
+///
+/// Volontairement dépourvue de prix et de date d'achat : c'est ce qui la
+/// distingue d'une carte de la collection, et ce qui la tient à l'écart des
+/// statistiques d'investissement. L'achat la transforme en `Card`.
+model WatchedCard {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  externalId String?
+
+  name String
+
+  extension String?
+
+  number String?
+
+  category String?
+
+  language String?
+
+  condition String?
+
+  quantity Int @default(1)
+
+  currentPrice Float?
+
+  priceSource String?
+
+  priceUpdatedAt DateTime?
+
+  imageUrl String?
+
+  cardmarketUrl String?
+
+  notes String?
 
   createdAt DateTime @default(now())
 }

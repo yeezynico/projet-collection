@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Cpu,
+  Eye,
   Package,
   TrendingUp,
   Settings,
@@ -16,6 +17,7 @@ import { signOut } from "next-auth/react";
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
   { href: "/cards", icon: Cpu, label: "Cartes" },
+  { href: "/watchlist", icon: Eye, label: "Cartes à suivre" },
   { href: "/sealed", icon: Package, label: "Produits scellés" },
   { href: "/sales", icon: TrendingUp, label: "Historique des ventes" },
   { href: "/settings", icon: Settings, label: "Paramètres" },

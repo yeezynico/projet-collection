@@ -55,15 +55,26 @@ function MarketRow({ href, logo, name, subtitle }) {
  *
  * `sale` bascule les intitulés vers le passé : l'article a quitté la
  * collection, le montant affiché est celui auquel il est parti.
+ *
+ * `watched` désigne une carte simplement surveillée : n'ayant pas été achetée,
+ * elle n'a ni coût ni gain, et seule sa cote est affichée.
  */
-export default function ItemDetailModal({ item, kind = "card", sale = false, onClose }) {
+export default function ItemDetailModal({
+  item,
+  kind = "card",
+  sale = false,
+  watched = false,
+  onClose,
+}) {
   useModalDismiss(onClose, !!item);
 
   if (!item) return null;
 
   const isCard = kind === "card";
-  const currentPrice = item.currentPrice ?? item.purchasePrice;
-  const invested = item.purchasePrice * item.quantity;
+  // Une carte suivie n'a pas de prix d'achat : les calculs de gain n'ont
+  // pas lieu d'être, et les lire donnerait NaN.
+  const currentPrice = item.currentPrice ?? item.purchasePrice ?? 0;
+  const invested = (item.purchasePrice ?? 0) * item.quantity;
   const value = currentPrice * item.quantity;
   const gain = value - invested;
   const gainPercent = invested > 0 ? (gain / invested) * 100 : null;
@@ -167,10 +178,10 @@ export default function ItemDetailModal({ item, kind = "card", sale = false, onC
                 )}
               </Spec>
 
-              <Spec label={sale ? "Quantité vendue" : "Quantité"}>
+              <Spec label={sale ? "Quantité vendue" : watched ? "Quantité suivie" : "Quantité"}>
                 {item.quantity}
               </Spec>
-              <Spec label={sale ? "Vendu le" : "Acheté le"}>
+              <Spec label={sale ? "Vendu le" : watched ? "Suivie depuis" : "Acheté le"}>
                 {purchaseDate || "—"}
               </Spec>
             </div>
@@ -192,62 +203,79 @@ export default function ItemDetailModal({ item, kind = "card", sale = false, onC
 
         {/* Valeur */}
         <div className="px-5 sm:px-8 py-6 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {watched ? (
             <div className="surface-gold rounded-2xl px-4 py-4 text-center">
               <p className="text-[11px] uppercase tracking-wider text-dark-500">
-                {sale ? "Prix de vente" : "Estimation"}
+                Cote suivie
               </p>
               <p className="text-3xl font-bold text-gradient-gold mt-1">
-                {currentPrice.toFixed(2)} €
+                {item.currentPrice != null
+                  ? `${item.currentPrice.toFixed(2)} €`
+                  : "à renseigner"}
+              </p>
+              <p className="text-xs text-dark-500 mt-2">
+                Carte surveillée, hors de vos investissements.
               </p>
             </div>
+          ) : (
+            <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="surface-gold rounded-2xl px-4 py-4 text-center">
+                <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                  {sale ? "Prix de vente" : "Estimation"}
+                </p>
+                <p className="text-3xl font-bold text-gradient-gold mt-1">
+                  {currentPrice.toFixed(2)} €
+                </p>
+              </div>
 
-            <div className="surface rounded-2xl px-4 py-4 text-center">
-              <p className="text-[11px] uppercase tracking-wider text-dark-500">
-                Prix d'achat
-              </p>
-              <p className="text-3xl font-bold text-dark-50 mt-1">
-                {item.purchasePrice.toFixed(2)} €
-              </p>
-            </div>
+              <div className="surface rounded-2xl px-4 py-4 text-center">
+                <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                  Prix d'achat
+                </p>
+                <p className="text-3xl font-bold text-dark-50 mt-1">
+                  {item.purchasePrice.toFixed(2)} €
+                </p>
+              </div>
 
-            <div
-              className={`rounded-2xl px-4 py-4 text-center border ${
-                gain > 0
-                  ? "bg-green-500/8 border-green-500/25"
-                  : gain < 0
-                    ? "bg-red-500/8 border-red-500/25"
-                    : "surface"
-              }`}
-            >
-              <p className="text-[11px] uppercase tracking-wider text-dark-500">
-                {sale ? "Gain réalisé" : "Gain"}
-              </p>
-              <p
-                className={`text-3xl font-bold mt-1 ${
+              <div
+                className={`rounded-2xl px-4 py-4 text-center border ${
                   gain > 0
-                    ? "text-green-400"
+                    ? "bg-green-500/8 border-green-500/25"
                     : gain < 0
-                      ? "text-red-400"
-                      : "text-dark-300"
+                      ? "bg-red-500/8 border-red-500/25"
+                      : "surface"
                 }`}
               >
-                {gain >= 0 ? "+" : ""}
-                {gain.toFixed(2)} €
-              </p>
-              {gainPercent !== null && (
+                <p className="text-[11px] uppercase tracking-wider text-dark-500">
+                  {sale ? "Gain réalisé" : "Gain"}
+                </p>
                 <p
-                  className={`text-xs mt-0.5 ${
-                    gain > 0 ? "text-green-400/70" : gain < 0 ? "text-red-400/70" : "text-dark-500"
+                  className={`text-3xl font-bold mt-1 ${
+                    gain > 0
+                      ? "text-green-400"
+                      : gain < 0
+                        ? "text-red-400"
+                        : "text-dark-300"
                   }`}
                 >
-                  {gainPercent >= 0 ? "+" : ""}
-                  {gainPercent.toFixed(1)} %
+                  {gain >= 0 ? "+" : ""}
+                  {gain.toFixed(2)} €
                 </p>
-              )}
+                {gainPercent !== null && (
+                  <p
+                    className={`text-xs mt-0.5 ${
+                      gain > 0 ? "text-green-400/70" : gain < 0 ? "text-red-400/70" : "text-dark-500"
+                    }`}
+                  >
+                    {gainPercent >= 0 ? "+" : ""}
+                    {gainPercent.toFixed(1)} %
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-
+            </>
+          )}
         </div>
 
         {/* Comparaison des places de marché */}
