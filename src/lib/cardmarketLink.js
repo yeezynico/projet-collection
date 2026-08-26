@@ -28,16 +28,51 @@ export function ptcgioIdFor(cardId, localId) {
 }
 
 /**
+ * Répare un suffixe manifestement erroné, sans toucher au reste.
+ *
+ * La table de pokemontcg.io comporte quelques entrées fautives : le Primo-Groudon
+ * EX de Primo-Choc y pointe vers `Primal-Groudon-EX-V2-OS` au lieu de
+ * `…-V2-PRC151`. La réparation ne s'applique qu'en présence d'un marqueur de
+ * variante (« -V2 »), lequel annonce un suffixe de code : si celui qui suit ne
+ * contient pas le numéro de la carte, il est remplacé — le marqueur, lui, est
+ * conservé, car il est précisément ce qu'on ne sait pas deviner.
+ *
+ * Les adresses sans marqueur ne sont jamais modifiées : « Celebrations/Lugia »
+ * est correcte telle quelle, et lui accoler un code la casserait.
+ */
+function repairSuffix(pathname, setId, localId) {
+  const code = setCodeFor(setId);
+  if (!code || !localId) return pathname;
+
+  const cut = pathname.lastIndexOf("/");
+  const segment = pathname.slice(cut + 1);
+
+  const parts = segment.match(/^(.*-V\d+)-([A-Za-z][A-Za-z0-9]*)$/);
+  if (!parts) return pathname;
+
+  const bare = String(localId).replace(/^0+(?=.)/, "");
+  if (parts[2].includes(bare) || parts[2].includes(String(localId))) {
+    return pathname;
+  }
+
+  return `${pathname.slice(0, cut + 1)}${parts[1]}-${code}${localId}`;
+}
+
+/**
  * Adresse française de la fiche, débarrassée du marquage publicitaire.
  * La redirection pointe vers la version anglaise du site.
  */
-function toFrenchProductUrl(location) {
+function toFrenchProductUrl(location, { setId, localId } = {}) {
   try {
     const url = new URL(location);
     if (!url.hostname.endsWith("cardmarket.com")) return null;
 
     url.hostname = "www.cardmarket.com";
-    url.pathname = url.pathname.replace(/^\/[a-z]{2}\//, "/fr/");
+    url.pathname = repairSuffix(
+      url.pathname.replace(/^\/[a-z]{2}\//, "/fr/"),
+      setId,
+      localId
+    );
     url.search = "";
     return url.toString();
   } catch {
@@ -64,7 +99,12 @@ export async function resolveCardmarketUrl(cardId, localId, attempts = 3) {
       });
 
       const location = res.headers.get("location");
-      if (location) return toFrenchProductUrl(location);
+      if (location) {
+        return toFrenchProductUrl(location, {
+          setId: setIdOf(cardId),
+          localId,
+        });
+      }
 
       // 404 franc : la carte n'est pas dans leur table, inutile d'insister.
       if (res.status === 404) return null;

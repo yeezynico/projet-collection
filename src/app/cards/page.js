@@ -658,11 +658,6 @@ export default function CardsPage() {
                   })}
                 </div>
               )}
-              <p className="text-xs text-dark-500">
-                Récupère nom, extension, numéro, rareté et photo. Le prix proposé est une
-                moyenne européenne toutes langues — ajustez-le avec le bouton « Vérifier sur
-                Cardmarket ».
-              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
