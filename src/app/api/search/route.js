@@ -18,10 +18,11 @@ import {
 // mieux vaut inviter à préciser le nom.
 const MAX_RESULTS = 60;
 
-// Chaque extension à compléter coûte le téléchargement d'un catalogue de
-// plusieurs mégaoctets. Trois suffisent à couvrir les premières lignes de la
-// grille, celles que l'œil parcourt d'abord.
-const MAX_IMAGE_FALLBACK_SETS = 3;
+// Un catalogue TCGplayer pèse quelques centaines de kilooctets et arrive en
+// deux dixièmes de seconde ; toutes les extensions d'une recherche partent en
+// parallèle en moins de 250 ms. La borne ne protège que d'une requête
+// aberrante, elle n'est pas un compromis sur les vignettes.
+const MAX_IMAGE_FALLBACK_SETS = 25;
 
 // Les vignettes sont un agrément, pas le résultat : passé ce délai on rend
 // la grille telle quelle plutôt que de faire attendre davantage.
