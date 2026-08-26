@@ -18,10 +18,14 @@ import {
 // mieux vaut inviter à préciser le nom.
 const MAX_RESULTS = 60;
 
-// Chaque extension à compléter coûte un appel au catalogue TCGplayer. Ils
-// partent en parallèle et leur résultat est gardé 24 h : seule la toute
-// première recherche portant sur une extension en ressent le coût.
-const MAX_IMAGE_FALLBACK_SETS = 10;
+// Chaque extension à compléter coûte le téléchargement d'un catalogue de
+// plusieurs mégaoctets. Trois suffisent à couvrir les premières lignes de la
+// grille, celles que l'œil parcourt d'abord.
+const MAX_IMAGE_FALLBACK_SETS = 3;
+
+// Les vignettes sont un agrément, pas le résultat : passé ce délai on rend
+// la grille telle quelle plutôt que de faire attendre davantage.
+const IMAGE_BUDGET = 6000;
 
 /**
  * Récupère les illustrations que TCGdex n'a pas encore publiées.
@@ -44,7 +48,7 @@ async function fillMissingImages(results) {
     .sort((a, b) => b[1].length - a[1].length)
     .slice(0, MAX_IMAGE_FALLBACK_SETS);
 
-  await Promise.all(
+  const work = Promise.all(
     targets.map(async ([setId, cards]) => {
       try {
         const index = await fetchCardImageIndex(setId, {
@@ -75,6 +79,13 @@ async function fillMissingImages(results) {
       }
     })
   );
+
+  // Les cartes déjà complétées le restent : la course n'annule rien, elle
+  // cesse seulement d'attendre.
+  await Promise.race([
+    work,
+    new Promise((resolve) => setTimeout(resolve, IMAGE_BUDGET)),
+  ]);
 }
 
 /**

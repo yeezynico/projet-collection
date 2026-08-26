@@ -18,6 +18,17 @@ const CACHE = {
   next: { revalidate: 86400 },
 };
 
+/** Les listes de produits pèsent lourd : on borne l'attente. */
+const REQUEST_TIMEOUT = 8000;
+
+async function get(path) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...CACHE,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT),
+  });
+  return res.ok ? await res.json() : null;
+}
+
 /**
  * Groupes fourre-tout du catalogue : ils rassemblent les produits qui ne
  * sont rattachés à aucune extension (coffins Mega Charizard, promotions
@@ -62,23 +73,17 @@ export function similarity(query, candidate) {
 }
 
 export async function fetchGroups() {
-  const res = await fetch(`${BASE}/${POKEMON_CATEGORY}/groups`, CACHE);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await get(`/${POKEMON_CATEGORY}/groups`);
   return data?.results || [];
 }
 
 export async function fetchProducts(groupId) {
-  const res = await fetch(`${BASE}/${POKEMON_CATEGORY}/${groupId}/products`, CACHE);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await get(`/${POKEMON_CATEGORY}/${groupId}/products`);
   return data?.results || [];
 }
 
 export async function fetchPrices(groupId) {
-  const res = await fetch(`${BASE}/${POKEMON_CATEGORY}/${groupId}/prices`, CACHE);
-  if (!res.ok) return [];
-  const data = await res.json();
+  const data = await get(`/${POKEMON_CATEGORY}/${groupId}/prices`);
   return data?.results || [];
 }
 

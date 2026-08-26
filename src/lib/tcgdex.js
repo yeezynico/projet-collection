@@ -6,6 +6,10 @@ import { SET_CODE_TO_IDS } from "@/lib/pokemonSets";
 
 const API_BASE = "https://api.tcgdex.net/v2";
 
+// Une fonction sans état ne dispose que de quelques secondes : mieux vaut
+// renoncer à une source lente que se faire interrompre sans explication.
+const REQUEST_TIMEOUT = 8000;
+
 /**
  * Petite tolérance aux erreurs réseau transitoires.
  *
@@ -13,20 +17,29 @@ const API_BASE = "https://api.tcgdex.net/v2";
  * adresses Cardmarket, dont les segments reprennent les noms anglais.
  */
 export async function apiGet(path, { locale = "fr", attempts = 3 } = {}) {
+  const url = `${API_BASE}/${locale}${path}`;
+  let lastReason = "aucune réponse";
+
   for (let i = 0; i < attempts; i++) {
     try {
-      const res = await fetch(`${API_BASE}/${locale}${path}`, {
+      const res = await fetch(url, {
         next: { revalidate: 3600 },
+        // Sans délai maximal, une source qui ne répond pas immobilise la
+        // fonction jusqu'à ce que l'hébergeur la tue, sans rien expliquer.
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       });
       if (res.ok) return await res.json();
       if (res.status === 404) return null;
-    } catch {
-      // on retente
+      lastReason = `HTTP ${res.status}`;
+    } catch (e) {
+      lastReason = e?.name === "TimeoutError" ? "délai dépassé" : String(e?.message || e);
     }
     if (i < attempts - 1) {
       await new Promise((r) => setTimeout(r, 300 * (i + 1)));
     }
   }
+
+  console.error(`TCGdex injoignable (${lastReason}) : ${url}`);
   return null;
 }
 
