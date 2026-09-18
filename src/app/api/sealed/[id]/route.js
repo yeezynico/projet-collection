@@ -76,6 +76,36 @@ export async function PUT(req, { params }) {
   }
 }
 
+/** Déplace un produit scellé dans l'ordre personnalisé (glisser-déposer). */
+export async function PATCH(req, { params }) {
+  try {
+    const { id } = await params;
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const data = await req.json();
+    if (typeof data.sortOrder !== "number" || !Number.isFinite(data.sortOrder)) {
+      return NextResponse.json({ error: "sortOrder invalide" }, { status: 400 });
+    }
+
+    const { count } = await prisma.sealedProduct.updateMany({
+      where: { id, userId: session.user.id },
+      data: { sortOrder: data.sortOrder },
+    });
+
+    if (count === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Sealed PATCH error:", error);
+    return NextResponse.json({ error: "Error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req, { params }) {
   try {
     const { id } = await params;

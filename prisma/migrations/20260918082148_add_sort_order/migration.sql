@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE "SealedProduct" ADD COLUMN     "sortOrder" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "WatchedCard" ADD COLUMN     "sortOrder" DOUBLE PRECISION NOT NULL DEFAULT 0;

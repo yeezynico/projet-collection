@@ -54,6 +54,55 @@ export async function PUT(req, { params }) {
   }
 }
 
+/**
+ * Modifications ponctuelles d'une carte suivie : sa position dans l'ordre
+ * personnalisé (glisser-déposer) et/ou sa présence dans le panier simulé.
+ */
+export async function PATCH(req, { params }) {
+  try {
+    const { id } = await params;
+    const session = await auth();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const data = await req.json();
+    const update = {};
+
+    if (data.sortOrder !== undefined) {
+      if (typeof data.sortOrder !== "number" || !Number.isFinite(data.sortOrder)) {
+        return NextResponse.json({ error: "sortOrder invalide" }, { status: 400 });
+      }
+      update.sortOrder = data.sortOrder;
+    }
+
+    if (data.inBasket !== undefined) {
+      if (typeof data.inBasket !== "boolean") {
+        return NextResponse.json({ error: "inBasket invalide" }, { status: 400 });
+      }
+      update.inBasket = data.inBasket;
+    }
+
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: "Rien à mettre à jour" }, { status: 400 });
+    }
+
+    const { count } = await prisma.watchedCard.updateMany({
+      where: { id, userId: session.user.id },
+      data: update,
+    });
+
+    if (count === 0) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Watchlist PATCH error:", error);
+    return NextResponse.json({ error: "Error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(req, { params }) {
   try {
     const { id } = await params;

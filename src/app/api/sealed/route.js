@@ -18,7 +18,10 @@ export async function GET(req) {
       where.name = { contains: search, mode: "insensitive" };
     }
 
-    let orderBy = { createdAt: "desc" };
+    // "custom" respecte l'ordre glissé-déposé à la main (sortOrder), les
+    // produits jamais déplacés restant départagés par date d'ajout.
+    let orderBy = [{ sortOrder: "asc" }, { createdAt: "desc" }];
+    if (sort === "recent") orderBy = { createdAt: "desc" };
     if (sort === "name-asc") orderBy = { name: "asc" };
     if (sort === "name-desc") orderBy = { name: "desc" };
     if (sort === "price-asc") orderBy = { purchasePrice: "asc" };
@@ -64,6 +67,9 @@ export async function POST(req) {
         imageUrl: data.imageUrl,
         cardmarketUrl: data.cardmarketUrl,
         purchaseDate: new Date(data.purchaseDate),
+        // Valeur très négative : le produit ajouté apparaît en tête de
+        // l'ordre personnalisé, comme il le faisait déjà en tri "récent".
+        sortOrder: -Date.now(),
       },
     });
 

@@ -25,10 +25,11 @@ model User {
   sessions Session[]
 
   // Application Pokémon
-  cards   Card[]
-  sealed  SealedProduct[]
-  sales   Sale[]
-  watched WatchedCard[]
+  cards        Card[]
+  sealed       SealedProduct[]
+  sales        Sale[]
+  watched      WatchedCard[]
+  shoppingLots ShoppingLot[]
 
   createdAt DateTime @default(now())
 }
@@ -113,7 +114,6 @@ model Card {
 
   priceUpdatedAt DateTime?
 
-
   imageUrl String?
 
   cardmarketUrl String?
@@ -150,6 +150,10 @@ model SealedProduct {
 
   priceUpdatedAt DateTime?
 
+  // Position choisie à la main par glisser-déposer. Les produits existants
+  // valent 0 et restent départagés par `createdAt` ; un produit ajouté reçoit
+  // une valeur très négative pour apparaître en tête, comme avant.
+  sortOrder Float @default(0)
 
   imageUrl String?
 
@@ -197,11 +201,40 @@ model WatchedCard {
 
   priceUpdatedAt DateTime?
 
+  // Position choisie à la main par glisser-déposer. Les cartes existantes
+  // valent 0 et restent départagées par `createdAt` ; une carte ajoutée
+  // reçoit une valeur très négative pour apparaître en tête, comme avant.
+  sortOrder Float @default(0)
+
+  // Lots d'achat simulé (« Shop Wizard ») auxquels cette carte appartient.
+  // Une carte peut figurer dans plusieurs lots à la fois.
+  lots ShoppingLot[]
+
   imageUrl String?
 
   cardmarketUrl String?
 
   notes String?
+
+  createdAt DateTime @default(now())
+}
+
+//////////////////////
+// FUTURS ACHATS
+//////////////////////
+
+/// Lot nommé de cartes suivies, pour simuler le coût d'un achat groupé
+/// (ex. « Alt 30 ans ») sans toucher au prix d'achat réel : le total se
+/// recalcule à chaque affichage depuis `WatchedCard.currentPrice`.
+model ShoppingLot {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name String
+
+  cards WatchedCard[]
 
   createdAt DateTime @default(now())
 }

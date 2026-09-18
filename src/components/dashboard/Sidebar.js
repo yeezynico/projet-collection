@@ -8,6 +8,7 @@ import {
   Eye,
   Package,
   TrendingUp,
+  ShoppingBag,
   Settings,
   LogOut,
   X,
@@ -19,6 +20,7 @@ const navItems = [
   { href: "/cards", icon: Cpu, label: "Cartes" },
   { href: "/watchlist", icon: Eye, label: "Cartes à suivre" },
   { href: "/sealed", icon: Package, label: "Produits scellés" },
+  { href: "/future-purchases", icon: ShoppingBag, label: "Futur achat" },
   { href: "/sales", icon: TrendingUp, label: "Historique des ventes" },
   { href: "/settings", icon: Settings, label: "Paramètres" },
 ];

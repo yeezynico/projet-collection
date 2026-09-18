@@ -50,7 +50,9 @@ export default function SealedPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState("custom");
+  const [draggedId, setDraggedId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [sellingItem, setSellingItem] = useState(null);
@@ -308,6 +310,67 @@ export default function SealedPage() {
       return false;
     return true;
   });
+
+  // Le glisser-déposer ne porte que sur l'ordre personnalisé, et seulement
+  // quand rien n'est filtré : sinon la position dans la liste affichée ne
+  // correspondrait plus à la position réelle parmi tous les produits.
+  const canReorder = sort === "custom" && !debouncedSearch && activeFilterCount === 0;
+
+  /** Repère si la souris survole la moitié gauche ou droite du produit. */
+  function handleDragOver(e, item) {
+    if (!canReorder || draggedId === item.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientX - rect.left > rect.width / 2;
+    setDropTarget((prev) =>
+      prev && prev.id === item.id && prev.after === after
+        ? prev
+        : { id: item.id, after }
+    );
+  }
+
+  /** Déplace le produit glissé juste avant/après le produit survolé. */
+  function handleDrop() {
+    const dragId = draggedId;
+    const target = dropTarget;
+    setDraggedId(null);
+    setDropTarget(null);
+    if (!canReorder || !dragId || !target || dragId === target.id) return;
+
+    const dragIndex = sealed.findIndex((s) => s.id === dragId);
+    if (dragIndex === -1) return;
+
+    const reordered = [...sealed];
+    const [moved] = reordered.splice(dragIndex, 1);
+    const targetIndex = reordered.findIndex((s) => s.id === target.id);
+    if (targetIndex === -1) return;
+    const insertIndex = target.after ? targetIndex + 1 : targetIndex;
+    reordered.splice(insertIndex, 0, moved);
+
+    const prev = reordered[insertIndex - 1];
+    const next = reordered[insertIndex + 1];
+    let sortOrder;
+    if (prev && next) sortOrder = (prev.sortOrder + next.sortOrder) / 2;
+    else if (prev) sortOrder = prev.sortOrder + 1;
+    else if (next) sortOrder = next.sortOrder - 1;
+    else sortOrder = 0;
+
+    reordered[insertIndex] = { ...moved, sortOrder };
+
+    const previous = sealed;
+    setSealed(reordered);
+
+    fetch(`/api/sealed/${dragId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sortOrder }),
+    })
+      .then((res) => {
+        if (!res.ok) setSealed(previous);
+      })
+      .catch(() => setSealed(previous));
+  }
 
   const totalInvested = filteredSealed.reduce((sum, s) => sum + s.purchasePrice * s.quantity, 0);
   const totalValue = filteredSealed.reduce(
@@ -582,6 +645,7 @@ export default function SealedPage() {
             <input type="text" placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50" />
           </div>
           <select value={sort} onChange={(e) => setSort(e.target.value)} className="px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50">
+            <option value="custom">Ordre personnalisé</option>
             <option value="recent">Récent</option>
             <option value="name-asc">Nom A → Z</option>
             <option value="name-desc">Nom Z → A</option>
@@ -686,6 +750,14 @@ export default function SealedPage() {
           </div>
         )}
 
+        {sort === "custom" && (
+          <p className="text-xs text-dark-500 -mt-2">
+            {canReorder
+              ? "Glissez-déposez un produit pour le replacer où vous voulez."
+              : "Videz la recherche et les filtres pour pouvoir réorganiser les produits."}
+          </p>
+        )}
+
         {filteredSealed.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="surface rounded-2xl px-4 py-3">
@@ -756,7 +828,32 @@ export default function SealedPage() {
                   : null;
 
               return (
-                <div key={item.id} className="surface rounded-xl overflow-hidden surface-hover transition group">
+                <div
+                  key={item.id}
+                  draggable={canReorder}
+                  onDragStart={(e) => {
+                    setDraggedId(item.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => handleDragOver(e, item)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDrop();
+                  }}
+                  onDragEnd={() => {
+                    setDraggedId(null);
+                    setDropTarget(null);
+                  }}
+                  className={`surface rounded-xl overflow-hidden surface-hover transition group ${
+                    canReorder ? "cursor-grab active:cursor-grabbing" : ""
+                  } ${draggedId === item.id ? "opacity-40" : ""} ${
+                    dropTarget?.id === item.id && draggedId && draggedId !== item.id
+                      ? dropTarget.after
+                        ? "border-r-4 border-brand-primary"
+                        : "border-l-4 border-brand-primary"
+                      : ""
+                  }`}
+                >
                   <div
                     onClick={() => setDetailItem(item)}
                     className="relative aspect-square bg-dark-900 overflow-hidden flex items-center justify-center cursor-pointer"

@@ -43,7 +43,10 @@ export async function GET(req) {
 
     // Le tri par prix porte sur la cote suivie : c'est le seul montant
     // qu'une carte non achetée possède.
-    let orderBy = { createdAt: "desc" };
+    // "custom" respecte l'ordre glissé-déposé à la main (sortOrder), les
+    // cartes jamais déplacées restant départagées par date d'ajout.
+    let orderBy = [{ sortOrder: "asc" }, { createdAt: "desc" }];
+    if (sort === "recent") orderBy = { createdAt: "desc" };
     if (sort === "name-asc") orderBy = { name: "asc" };
     if (sort === "name-desc") orderBy = { name: "desc" };
     if (sort === "price-asc") orderBy = { currentPrice: "asc" };
@@ -71,7 +74,13 @@ export async function POST(req) {
     const data = await req.json();
 
     const created = await prisma.watchedCard.create({
-      data: { userId: session.user.id, ...payload(data) },
+      data: {
+        userId: session.user.id,
+        ...payload(data),
+        // Valeur très négative : la carte ajoutée apparaît en tête de
+        // l'ordre personnalisé, comme elle le faisait déjà en tri "récent".
+        sortOrder: -Date.now(),
+      },
     });
 
     return NextResponse.json(created, { status: 201 });

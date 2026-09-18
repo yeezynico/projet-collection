@@ -12,6 +12,7 @@ import {
   Link2,
   Loader2,
   ExternalLink,
+  ShoppingCart,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
@@ -48,7 +49,9 @@ export default function CardsPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState("custom");
+  const [draggedId, setDraggedId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [buyingCard, setBuyingCard] = useState(null);
@@ -62,6 +65,9 @@ export default function CardsPage() {
   const [selectedLanguages, setSelectedLanguages] = useState([]);
   const [selectedConditions, setSelectedConditions] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [lots, setLots] = useState([]);
+  const [lotPickerCard, setLotPickerCard] = useState(null);
+  const [newLotName, setNewLotName] = useState("");
   const [editingCard, setEditingCard] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
   const [detailCard, setDetailCard] = useState(null);
@@ -239,6 +245,81 @@ export default function CardsPage() {
     fetchCards();
   }, [fetchCards]);
 
+  const fetchLots = useCallback(async () => {
+    try {
+      const res = await fetch("/api/shopping-lots");
+      if (res.ok) setLots(await res.json());
+    } catch (error) {
+      console.error("Error fetching shopping lots:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLots();
+  }, [fetchLots]);
+
+  /** Ajoute ou retire une carte d'un lot depuis le sélecteur rapide. */
+  async function toggleCardInLot(lot, card) {
+    const inLot = lot.cards.some((c) => c.id === card.id);
+    const previous = lots;
+    setLots((prev) =>
+      prev.map((l) =>
+        l.id === lot.id
+          ? {
+              ...l,
+              cards: inLot
+                ? l.cards.filter((c) => c.id !== card.id)
+                : [...l.cards, card],
+            }
+          : l
+      )
+    );
+
+    try {
+      const res = await fetch(
+        inLot
+          ? `/api/shopping-lots/${lot.id}/cards/${card.id}`
+          : `/api/shopping-lots/${lot.id}/cards`,
+        {
+          method: inLot ? "DELETE" : "POST",
+          headers: inLot ? undefined : { "Content-Type": "application/json" },
+          body: inLot ? undefined : JSON.stringify({ cardId: card.id }),
+        }
+      );
+      if (!res.ok) setLots(previous);
+    } catch (error) {
+      console.error("Error toggling card in lot:", error);
+      setLots(previous);
+    }
+  }
+
+  /** Crée un nouveau lot et y ajoute directement la carte en cours. */
+  async function createLotWithCard(card) {
+    const name = newLotName.trim();
+    if (!name) return;
+
+    try {
+      const res = await fetch("/api/shopping-lots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) return;
+      const lot = await res.json();
+      setNewLotName("");
+
+      const addRes = await fetch(`/api/shopping-lots/${lot.id}/cards`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cardId: card.id }),
+      });
+      const finalLot = addRes.ok ? { ...lot, cards: [card] } : lot;
+      setLots((prev) => [finalLot, ...prev]);
+    } catch (error) {
+      console.error("Error creating lot:", error);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     try {
@@ -388,6 +469,67 @@ export default function CardsPage() {
       return false;
     return true;
   });
+
+  // Le glisser-déposer ne porte que sur l'ordre personnalisé, et seulement
+  // quand rien n'est filtré : sinon la position dans la liste affichée ne
+  // correspondrait plus à la position réelle parmi toutes les cartes.
+  const canReorder = sort === "custom" && !debouncedSearch && activeFilterCount === 0;
+
+  /** Repère si la souris survole la moitié gauche ou droite de la carte. */
+  function handleDragOver(e, card) {
+    if (!canReorder || draggedId === card.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientX - rect.left > rect.width / 2;
+    setDropTarget((prev) =>
+      prev && prev.id === card.id && prev.after === after
+        ? prev
+        : { id: card.id, after }
+    );
+  }
+
+  /** Déplace la carte glissée juste avant/après la carte survolée. */
+  function handleDrop() {
+    const dragId = draggedId;
+    const target = dropTarget;
+    setDraggedId(null);
+    setDropTarget(null);
+    if (!canReorder || !dragId || !target || dragId === target.id) return;
+
+    const dragIndex = cards.findIndex((c) => c.id === dragId);
+    if (dragIndex === -1) return;
+
+    const reordered = [...cards];
+    const [moved] = reordered.splice(dragIndex, 1);
+    const targetIndex = reordered.findIndex((c) => c.id === target.id);
+    if (targetIndex === -1) return;
+    const insertIndex = target.after ? targetIndex + 1 : targetIndex;
+    reordered.splice(insertIndex, 0, moved);
+
+    const prev = reordered[insertIndex - 1];
+    const next = reordered[insertIndex + 1];
+    let sortOrder;
+    if (prev && next) sortOrder = (prev.sortOrder + next.sortOrder) / 2;
+    else if (prev) sortOrder = prev.sortOrder + 1;
+    else if (next) sortOrder = next.sortOrder - 1;
+    else sortOrder = 0;
+
+    reordered[insertIndex] = { ...moved, sortOrder };
+
+    const previous = cards;
+    setCards(reordered);
+
+    fetch(`/api/watchlist/${dragId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sortOrder }),
+    })
+      .then((res) => {
+        if (!res.ok) setCards(previous);
+      })
+      .catch(() => setCards(previous));
+  }
 
   return (
     <DashboardLayout user={session?.user}>
@@ -865,6 +1007,7 @@ export default function CardsPage() {
             onChange={(e) => setSort(e.target.value)}
             className="px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50"
           >
+            <option value="custom">Ordre personnalisé</option>
             <option value="recent">Récent</option>
             <option value="name-asc">Nom A → Z</option>
             <option value="name-desc">Nom Z → A</option>
@@ -969,6 +1112,14 @@ export default function CardsPage() {
           </div>
         )}
 
+        {sort === "custom" && (
+          <p className="text-xs text-dark-500 -mt-2">
+            {canReorder
+              ? "Glissez-déposez une carte pour la replacer où vous voulez."
+              : "Videz la recherche et les filtres pour pouvoir réorganiser les cartes."}
+          </p>
+        )}
+
         {/* Cards List */}
         {loading ? (
           <div className="text-center py-12">
@@ -994,7 +1145,29 @@ export default function CardsPage() {
               return (
                 <div
                   key={card.id}
-                  className="surface rounded-xl overflow-hidden surface-hover transition group"
+                  draggable={canReorder}
+                  onDragStart={(e) => {
+                    setDraggedId(card.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => handleDragOver(e, card)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDrop();
+                  }}
+                  onDragEnd={() => {
+                    setDraggedId(null);
+                    setDropTarget(null);
+                  }}
+                  className={`surface rounded-xl overflow-hidden surface-hover transition group ${
+                    canReorder ? "cursor-grab active:cursor-grabbing" : ""
+                  } ${draggedId === card.id ? "opacity-40" : ""} ${
+                    dropTarget?.id === card.id && draggedId && draggedId !== card.id
+                      ? dropTarget.after
+                        ? "border-r-4 border-brand-primary"
+                        : "border-l-4 border-brand-primary"
+                      : ""
+                  }`}
                 >
                   <div
                     onClick={() => setDetailCard(card)}
@@ -1072,6 +1245,24 @@ export default function CardsPage() {
                     </div>
 
                     <div className="flex gap-1 pt-1 border-t border-dark-700">
+                      <button
+                        onClick={() => setLotPickerCard(card)}
+                        title="Ajouter à un lot (Futur achat)"
+                        className={`px-1.5 py-1 rounded transition ${
+                          lots.some((l) => l.cards.some((c) => c.id === card.id))
+                            ? "bg-brand-secondary/20 text-brand-secondary"
+                            : "bg-dark-700 text-dark-300 hover:bg-dark-600"
+                        }`}
+                      >
+                        <ShoppingCart
+                          size={11}
+                          fill={
+                            lots.some((l) => l.cards.some((c) => c.id === card.id))
+                              ? "currentColor"
+                              : "none"
+                          }
+                        />
+                      </button>
                       <button
                         onClick={() => openBuyModal(card)}
                         title="Ajouter à ma collection"
@@ -1481,6 +1672,96 @@ export default function CardsPage() {
           }
         />
       </div>
+
+      {/* Sélecteur de lots : choisir dans quel(s) « Futur achat » ranger
+          cette carte, ou en créer un nouveau à la volée. */}
+      {lotPickerCard && (
+        <Modal
+          onClose={() => {
+            setLotPickerCard(null);
+            setNewLotName("");
+          }}
+          panelClassName="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-16 rounded-lg overflow-hidden bg-dark-900 flex items-center justify-center shrink-0">
+              {lotPickerCard.imageUrl ? (
+                <img
+                  src={getImageSrc(lotPickerCard.imageUrl)}
+                  alt={lotPickerCard.name}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <ImageOff size={20} className="text-dark-600" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-dark-400 uppercase tracking-wide">Ajouter au lot</p>
+              <h2 className="text-base font-semibold text-dark-50 truncate">
+                {lotPickerCard.name}
+              </h2>
+            </div>
+          </div>
+
+          {lots.length > 0 && (
+            <div className="space-y-1.5 mb-4">
+              {lots.map((lot) => {
+                const inLot = lot.cards.some((c) => c.id === lotPickerCard.id);
+                return (
+                  <button
+                    key={lot.id}
+                    onClick={() => toggleCardInLot(lot, lotPickerCard)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border transition text-left ${
+                      inLot
+                        ? "bg-brand-secondary/15 border-brand-secondary"
+                        : "bg-dark-900 border-dark-700 hover:border-dark-600"
+                    }`}
+                  >
+                    <span
+                      className={`w-4 h-4 rounded shrink-0 border flex items-center justify-center ${
+                        inLot
+                          ? "bg-brand-secondary border-brand-secondary"
+                          : "border-dark-600"
+                      }`}
+                    >
+                      {inLot && <span className="w-1.5 h-1.5 bg-dark-950 rounded-sm" />}
+                    </span>
+                    <span className="flex-1 min-w-0 text-sm text-dark-100 truncate">
+                      {lot.name}
+                    </span>
+                    <span className="text-xs text-dark-500 shrink-0">
+                      {lot.cards.length} carte{lot.cards.length > 1 ? "s" : ""}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newLotName}
+              onChange={(e) => setNewLotName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  createLotWithCard(lotPickerCard);
+                }
+              }}
+              placeholder="Nouveau lot (ex: Alt 30 ans)"
+              className="flex-1 min-w-0 px-3 py-2 bg-dark-900 border border-dark-700 rounded-lg text-dark-50 text-sm"
+            />
+            <button
+              onClick={() => createLotWithCard(lotPickerCard)}
+              disabled={!newLotName.trim()}
+              className="px-3 py-2 btn-gold rounded-lg font-semibold text-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Créer
+            </button>
+          </div>
+        </Modal>
+      )}
     </DashboardLayout>
   );
 }
