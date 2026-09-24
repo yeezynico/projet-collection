@@ -121,6 +121,8 @@ model Card {
   purchaseDate DateTime
 
   createdAt DateTime @default(now())
+
+  priceHistory PriceHistory[]
 }
 
 model SealedProduct {
@@ -162,6 +164,8 @@ model SealedProduct {
   purchaseDate DateTime
 
   createdAt DateTime @default(now())
+
+  priceHistory PriceHistory[]
 }
 
 //////////////////////
@@ -217,6 +221,8 @@ model WatchedCard {
   notes String?
 
   createdAt DateTime @default(now())
+
+  priceHistory PriceHistory[]
 }
 
 //////////////////////
@@ -283,5 +289,37 @@ model Sale {
   saleDate DateTime
 
   createdAt DateTime @default(now())
+}
+
+//////////////////////
+// HISTORIQUE DES PRIX
+//////////////////////
+
+/// Courbe d'évolution du prix d'une carte, d'un produit scellé ou d'une carte
+/// suivie. Un seul point par jour et par article : une nouvelle saisie sur
+/// une date déjà enregistrée met à jour ce point au lieu d'en empiler un
+/// autre (évite l'explosion du nombre de lignes si le prix est corrigé
+/// plusieurs fois le même jour).
+model PriceHistory {
+  id String @id @default(uuid())
+
+  cardId String?
+  card   Card?   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  sealedId String?
+  sealed   SealedProduct? @relation(fields: [sealedId], references: [id], onDelete: Cascade)
+
+  watchedId String?
+  watched   WatchedCard? @relation(fields: [watchedId], references: [id], onDelete: Cascade)
+
+  price Float
+
+  date DateTime @db.Date
+
+  createdAt DateTime @default(now())
+
+  @@unique([cardId, date])
+  @@unique([sealedId, date])
+  @@unique([watchedId, date])
 }
 

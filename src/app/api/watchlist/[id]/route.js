@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertPricePoint } from "@/lib/priceHistory";
 import { NextResponse } from "next/server";
 
 /** Carte suivie appartenant bien à la personne connectée. */
@@ -46,6 +47,20 @@ export async function PUT(req, { params }) {
         notes: data.notes || null,
       },
     });
+
+    // La date accompagnant le prix ouvre (ou met à jour) un point dans la
+    // courbe d'évolution ; `currentPrice` est ensuite resynchronisé sur le
+    // point le plus récent, qui n'est pas forcément celui qu'on vient de
+    // saisir si la date entrée est dans le passé.
+    if (data.priceDate && updated.currentPrice != null) {
+      const latest = await upsertPricePoint(
+        "watched",
+        id,
+        updated.currentPrice,
+        data.priceDate
+      );
+      updated.currentPrice = latest.price;
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

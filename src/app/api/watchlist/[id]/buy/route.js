@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertPricePoint, toDateOnly } from "@/lib/priceHistory";
 import { NextResponse } from "next/server";
 
 /**
@@ -63,10 +64,26 @@ export async function POST(req, { params }) {
         },
       });
 
+      // La carte achetée reprend l'historique de prix qu'elle avait en tant
+      // que carte suivie : le suivi continue, il ne repart pas de zéro.
+      await tx.priceHistory.updateMany({
+        where: { watchedId: id },
+        data: { watchedId: null, cardId: created.id },
+      });
+
       await tx.watchedCard.delete({ where: { id } });
 
       return created;
     });
+
+    // Point d'achat : upsert après la transaction, car il doit resynchroniser
+    // `currentPrice` sur le point le plus récent de l'historique repris.
+    await upsertPricePoint(
+      "card",
+      card.id,
+      currentPrice,
+      toDateOnly(card.purchaseDate)
+    );
 
     return NextResponse.json(card, { status: 201 });
   } catch (error) {

@@ -37,6 +37,7 @@ const emptyForm = {
   condition: "NM",
   quantity: "1",
   currentPrice: "",
+  priceDate: "",
   priceSource: "",
   priceUpdatedAt: "",
   imageUrl: "",
@@ -378,6 +379,9 @@ export default function CardsPage() {
       condition: card.condition ?? "",
       quantity: card.quantity.toString(),
       currentPrice: card.currentPrice != null ? card.currentPrice.toString() : "",
+      // Toujours la date du jour par défaut : seule une modification
+      // volontaire de ce champ date le point ailleurs dans le temps.
+      priceDate: new Date().toISOString().split("T")[0],
       priceSource: card.priceSource ?? "",
       priceUpdatedAt: card.priceUpdatedAt ?? "",
       imageUrl: card.imageUrl ?? "",
@@ -1577,6 +1581,24 @@ export default function CardsPage() {
                     )}
                   </div>
                 </div>
+                {editData.currentPrice !== "" && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-sm font-medium text-dark-200 mb-2">
+                      Date de ce prix *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={editData.priceDate}
+                      onChange={(e) => setEditData({ ...editData, priceDate: e.target.value })}
+                      className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                    />
+                    <p className="text-xs text-dark-500 mt-1.5">
+                      Ajoute un point à la courbe d'évolution ; une même date
+                      remplace le point déjà enregistré ce jour-là.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {editData.priceSource && (
@@ -1661,6 +1683,7 @@ export default function CardsPage() {
         <ItemDetailModal
           watched
           kind="card"
+          priceHistoryEndpoint={detailCard ? `/api/watchlist/${detailCard.id}/price-history` : undefined}
           onClose={() => setDetailCard(null)}
           item={
             detailCard && {

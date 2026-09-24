@@ -10,6 +10,7 @@ import {
   getCondition,
 } from "@/lib/categories";
 import { buildSearchQuery, ebaySoldUrl, vintedUrl } from "@/lib/marketplaces";
+import PriceHistoryChart from "@/components/PriceHistoryChart";
 
 /** Caractéristique affichée à droite de l'illustration. */
 function Spec({ label, children }) {
@@ -58,12 +59,17 @@ function MarketRow({ href, logo, name, subtitle }) {
  *
  * `watched` désigne une carte simplement surveillée : n'ayant pas été achetée,
  * elle n'a ni coût ni gain, et seule sa cote est affichée.
+ *
+ * `priceHistoryEndpoint` affiche la courbe d'évolution du prix quand elle est
+ * fournie ; un article vendu (`sale`) n'en a pas, l'historique disparaissant
+ * avec lui.
  */
 export default function ItemDetailModal({
   item,
   kind = "card",
   sale = false,
   watched = false,
+  priceHistoryEndpoint,
   onClose,
 }) {
   useModalDismiss(onClose, !!item);
@@ -322,6 +328,16 @@ export default function ItemDetailModal({
             }
           />
         </div>
+
+        {/* Évolution du prix */}
+        {priceHistoryEndpoint && (
+          <div className="px-5 sm:px-8 pb-8">
+            <h3 className="text-sm font-semibold text-dark-200 mb-3">
+              Évolution du prix
+            </h3>
+            <PriceHistoryChart key={priceHistoryEndpoint} endpoint={priceHistoryEndpoint} />
+          </div>
+        )}
         </div>
       </div>
     </div>

@@ -37,6 +37,7 @@ const emptyForm = {
   // le plus souvent, et elle évite d'avoir à effacer un champ vide obligatoire.
   purchasePrice: "0",
   currentPrice: "",
+  priceDate: "",
   priceSource: "",
   priceUpdatedAt: "",
   imageUrl: "",
@@ -209,6 +210,9 @@ export default function SealedPage() {
       quantity: item.quantity.toString(),
       purchasePrice: item.purchasePrice.toString(),
       currentPrice: (item.currentPrice ?? item.purchasePrice).toString(),
+      // Toujours la date du jour par défaut : seule une modification
+      // volontaire de ce champ date le point ailleurs dans le temps.
+      priceDate: new Date().toISOString().split("T")[0],
       priceSource: item.priceSource ?? "",
       priceUpdatedAt: item.priceUpdatedAt ?? "",
       imageUrl: item.imageUrl ?? "",
@@ -1177,6 +1181,20 @@ export default function SealedPage() {
                     )}
                   </div>
                 </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium text-dark-200 mb-2">Date de ce prix *</label>
+                  <input
+                    type="date"
+                    required
+                    value={editData.priceDate}
+                    onChange={(e) => setEditData({ ...editData, priceDate: e.target.value })}
+                    className="w-full px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 focus:border-brand-primary"
+                  />
+                  <p className="text-xs text-dark-500 mt-1.5">
+                    Ajoute un point à la courbe d'évolution ; une même date
+                    remplace le point déjà enregistré ce jour-là.
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -1260,6 +1278,7 @@ export default function SealedPage() {
         <ItemDetailModal
           item={detailItem}
           kind="sealed"
+          priceHistoryEndpoint={detailItem ? `/api/sealed/${detailItem.id}/price-history` : undefined}
           onClose={() => setDetailItem(null)}
         />
       </div>

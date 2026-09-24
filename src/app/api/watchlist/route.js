@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertPricePoint } from "@/lib/priceHistory";
 import { NextResponse } from "next/server";
 
 /** Champs modifiables d'une carte suivie, sans prix ni date d'achat. */
@@ -82,6 +83,12 @@ export async function POST(req) {
         sortOrder: -Date.now(),
       },
     });
+
+    // Premier point de la courbe d'évolution, s'il y a déjà une cote : une
+    // carte suivie n'a pas de date d'achat, on prend le jour de l'ajout.
+    if (created.currentPrice != null) {
+      await upsertPricePoint("watched", created.id, created.currentPrice, created.createdAt);
+    }
 
     return NextResponse.json(created, { status: 201 });
   } catch (error) {

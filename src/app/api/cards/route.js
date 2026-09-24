@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { upsertPricePoint } from "@/lib/priceHistory";
 import { NextResponse } from "next/server";
 
 export async function GET(req) {
@@ -71,6 +72,12 @@ export async function POST(req) {
         purchaseDate: new Date(data.purchaseDate),
       },
     });
+
+    // Premier point de la courbe d'évolution : le prix à l'entrée dans la
+    // collection, daté du jour d'achat.
+    if (card.currentPrice != null) {
+      await upsertPricePoint("card", card.id, card.currentPrice, card.purchaseDate);
+    }
 
     return NextResponse.json(card, { status: 201 });
   } catch (error) {
