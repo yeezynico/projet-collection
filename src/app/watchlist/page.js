@@ -14,7 +14,6 @@ import {
   ExternalLink,
   ShoppingCart,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
 import {
@@ -45,7 +44,6 @@ const emptyForm = {
 };
 
 export default function CardsPage() {
-  const { data: session } = useSession();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -536,7 +534,7 @@ export default function CardsPage() {
   }
 
   return (
-    <DashboardLayout user={session?.user}>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">

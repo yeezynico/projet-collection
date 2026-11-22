@@ -13,12 +13,10 @@ import {
   ChevronUp,
   ShoppingBag,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
 
 export default function FuturePurchasesPage() {
-  const { data: session } = useSession();
   const [lots, setLots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [newLotName, setNewLotName] = useState("");
@@ -186,7 +184,7 @@ export default function FuturePurchasesPage() {
     : [];
 
   return (
-    <DashboardLayout user={session?.user}>
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

@@ -1,5 +1,4 @@
 import "./globals.css";
-import AuthProvider from "@/components/AuthProvider";
 
 export const metadata = {
   title: "Pokémon Collection",
@@ -10,7 +9,7 @@ export default function RootLayout({ children }) {
   return (
     <html lang="fr" className="dark" suppressHydrationWarning>
       <body className="min-h-screen" suppressHydrationWarning>
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );

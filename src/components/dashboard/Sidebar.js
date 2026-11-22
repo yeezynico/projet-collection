@@ -9,7 +9,6 @@ import {
   Package,
   TrendingUp,
   ShoppingBag,
-  Settings,
   LogOut,
   X,
 } from "lucide-react";
@@ -22,10 +21,9 @@ const navItems = [
   { href: "/sealed", icon: Package, label: "Produits scellés" },
   { href: "/future-purchases", icon: ShoppingBag, label: "Futur achat" },
   { href: "/sales", icon: TrendingUp, label: "Historique des ventes" },
-  { href: "/settings", icon: Settings, label: "Paramètres" },
 ];
 
-export default function Sidebar({ user, onClose }) {
+export default function Sidebar({ onClose }) {
   const pathname = usePathname();
 
   return (
@@ -65,14 +63,7 @@ export default function Sidebar({ user, onClose }) {
       </nav>
 
       {/* User section */}
-      <div className="p-6 border-t border-dark-700 space-y-4">
-        <div className="px-4">
-          <p className="text-xs text-dark-400 mb-1">Connecté en tant que</p>
-          <p className="text-sm font-semibold text-dark-50 truncate">
-            {user?.name || user?.email}
-          </p>
-        </div>
-
+      <div className="p-6 border-t border-dark-700">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-dark-300 hover:bg-red-500/10 hover:text-red-400 transition"

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo } from "react";
 import DashboardLayout from "@/components/dashboard/Layout";
-import { useSession } from "next-auth/react";
 import { ImageOff, Search, ChevronLeft, ChevronRight, SlidersHorizontal, Pencil, Trash2, Plus, Link2, Loader2 } from "lucide-react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
@@ -225,7 +224,6 @@ function PeriodPicker({ type, range, onSelect }) {
 }
 
 export default function SalesPage() {
-  const { data: session } = useSession();
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -526,7 +524,7 @@ export default function SalesPage() {
   const totalPercentage = totalInvested > 0 ? (totalGain / totalInvested) * 100 : null;
 
   return (
-    <DashboardLayout user={session?.user}>
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>

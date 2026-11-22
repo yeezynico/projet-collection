@@ -5,7 +5,7 @@ import Sidebar from "./Sidebar";
 import Header from "./Header";
 import { Menu, X } from "lucide-react";
 
-export default function DashboardLayout({ children, user }) {
+export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -16,7 +16,7 @@ export default function DashboardLayout({ children, user }) {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <Sidebar user={user} onClose={() => setSidebarOpen(false)} />
+        <Sidebar onClose={() => setSidebarOpen(false)} />
       </aside>
 
       {/* Main content, décalé pour laisser la place à la sidebar fixe */}

@@ -170,7 +170,7 @@ export default async function DashboardPage() {
   const stats = await getStats(session.user.id);
 
   return (
-    <DashboardLayout user={session.user}>
+    <DashboardLayout>
       <div className="space-y-4 max-w-6xl mx-auto">
         <div>
           <h1 className="text-2xl font-bold text-dark-50">Portefeuille</h1>
