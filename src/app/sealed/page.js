@@ -13,7 +13,6 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
 import {
@@ -46,7 +45,6 @@ const emptyForm = {
 };
 
 export default function SealedPage() {
-  const { data: session } = useSession();
   const [sealed, setSealed] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -71,6 +69,11 @@ export default function SealedPage() {
   const [priceHelper, setPriceHelper] = useState(null);
   const [editData, setEditData] = useState(emptyForm);
   const [lookupUrl, setLookupUrl] = useState("");
+  const [catalogQuery, setCatalogQuery] = useState("");
+  const [catalogResults, setCatalogResults] = useState([]);
+  const [catalogTotal, setCatalogTotal] = useState(0);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupError, setLookupError] = useState("");
   const [lookupInfo, setLookupInfo] = useState("");
@@ -88,6 +91,80 @@ export default function SealedPage() {
 
   const activeFilterCount =
     selectedTypes.length + selectedLanguages.length + selectedConditions.length;
+
+  /** Cherche un produit scellé dans le catalogue (« etb », « display règne delta »…). */
+  async function handleCatalogSearch() {
+    const query = catalogQuery.trim();
+    if (query.length < 2) return;
+
+    setCatalogLoading(true);
+    setCatalogError("");
+    setCatalogResults([]);
+    setLookupInfo("");
+
+    try {
+      const res = await fetch(`/api/sealed/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+
+      if (!res.ok) {
+        setCatalogError(data.error || "Recherche impossible");
+        return;
+      }
+
+      setCatalogResults(data.results);
+      setCatalogTotal(data.total || data.results.length);
+      if (!data.results.length) {
+        setCatalogError(`Aucun produit ne correspond à « ${query} ».`);
+      }
+    } catch {
+      setCatalogError("Erreur réseau lors de la recherche");
+    } finally {
+      setCatalogLoading(false);
+    }
+  }
+
+  /** Remplit le formulaire avec le produit choisi, puis charge son prix indicatif. */
+  async function pickCatalogResult(product) {
+    setFormData((prev) => ({
+      ...prev,
+      externalId: product.id,
+      name: product.name,
+      type: product.type,
+      imageUrl: product.imageUrl || prev.imageUrl,
+      cardmarketUrl: product.cardmarketUrl || prev.cardmarketUrl,
+      currentPrice: "",
+      priceSource: "",
+      priceUpdatedAt: "",
+    }));
+    setCatalogResults([]);
+    setCatalogQuery("");
+    setLookupInfo(`${product.name} sélectionné. Recherche du prix indicatif...`);
+
+    try {
+      const res = await fetch(`/api/sealed/search?product=${encodeURIComponent(product.id)}`);
+      const data = res.ok ? await res.json() : {};
+
+      if (data.suggestedPrice != null) {
+        setFormData((prev) =>
+          prev.externalId === product.id
+            ? {
+                ...prev,
+                currentPrice: data.suggestedPrice.toFixed(2),
+                priceSource: data.priceSource || "",
+                priceUpdatedAt: data.priceUpdatedAt || "",
+              }
+            : prev
+        );
+        setLookupInfo(
+          `${product.name} sélectionné, prix indicatif de ${data.suggestedPrice.toFixed(2)} € — converti du marché américain, à vérifier sur Cardmarket.`
+        );
+      } else {
+        setLookupInfo(`${product.name} sélectionné. Prix à saisir manuellement.`);
+      }
+    } catch {
+      setLookupInfo(`${product.name} sélectionné. Prix à saisir manuellement.`);
+    }
+  }
 
   /** Pré-remplit le formulaire depuis un lien Cardmarket. */
   async function handleLookup() {
@@ -383,7 +460,7 @@ export default function SealedPage() {
   );
 
   return (
-    <DashboardLayout user={session?.user}>
+    <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
@@ -404,6 +481,93 @@ export default function SealedPage() {
         {showForm && (
           <form onSubmit={handleSubmit} className="surface rounded-2xl p-6 space-y-4">
             <h2 className="text-xl font-semibold text-dark-50 mb-4">Ajouter un produit</h2>
+
+            {/* Recherche dans le catalogue des produits scellés */}
+            <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium text-dark-100">
+                <Search size={16} className="text-brand-primary" />
+                Rechercher un produit
+              </label>
+
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  value={catalogQuery}
+                  onChange={(e) => setCatalogQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCatalogSearch();
+                    }
+                  }}
+                  placeholder="etb, display règne delta, coffret dracaufeu..."
+                  className="flex-1 min-w-64 px-4 py-2 bg-dark-900 border border-dark-600 rounded-lg text-dark-50 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleCatalogSearch}
+                  disabled={catalogLoading || catalogQuery.trim().length < 2}
+                  className="flex items-center gap-2 px-4 py-2 btn-gold rounded-lg font-semibold text-sm transition disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {catalogLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Recherche...
+                    </>
+                  ) : (
+                    "Chercher"
+                  )}
+                </button>
+              </div>
+
+              {catalogError && <p className="text-sm text-red-400">{catalogError}</p>}
+
+              {catalogResults.length > 0 && (
+                <>
+                  <p className="text-xs text-dark-400">
+                    {catalogTotal} produit{catalogTotal > 1 ? "s" : ""} trouvé
+                    {catalogTotal > 1 ? "s" : ""}
+                    {catalogTotal > catalogResults.length &&
+                      ` · ${catalogResults.length} affichés, précisez pour affiner`}
+                    . Cliquez sur le vôtre.
+                  </p>
+
+                  <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2 max-h-96 overflow-y-auto">
+                    {catalogResults.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => pickCatalogResult(product)}
+                        title={`${product.name} · ${product.setName}`}
+                        className="surface surface-hover rounded-lg overflow-hidden text-left transition"
+                      >
+                        <span className="block aspect-square bg-dark-950 p-1">
+                          {product.imageUrl ? (
+                            <img
+                              src={getImageSrc(product.imageUrl)}
+                              alt={product.name}
+                              loading="lazy"
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <span className="flex items-center justify-center w-full h-full text-dark-600">
+                              <ImageOff size={20} />
+                            </span>
+                          )}
+                        </span>
+                        <span className="block px-1.5 py-1">
+                          <span className="block text-[11px] font-semibold text-dark-100 line-clamp-2">
+                            {product.name}
+                          </span>
+                          <span className="block text-[10px] text-dark-500 truncate">
+                            {product.setName}
+                          </span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
             {/* Remplissage automatique depuis un lien Cardmarket */}
             <div className="bg-linear-to-br from-brand-primary/10 to-brand-secondary/10 border border-dark-600 rounded-xl p-4 space-y-3">

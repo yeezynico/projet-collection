@@ -25,6 +25,7 @@ export const TCGDEX_TO_PTCGIO = {
   "me03": "me3",
   "me04": "me4",
   "me05": "me5",
+  "me06": "me6",
   "sm3.5": "sm35",
   "sm7.5": "sm75",
   "sv01": "sv1",

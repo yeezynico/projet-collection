@@ -5,6 +5,7 @@
 // Code d'extension Cardmarket (ex. DRI) -> identifiants TCGdex
 export const SET_CODE_TO_IDS = {
   "151": ["sv03.5"],
+  "30C": ["30th", "30th-c"],
   "AIF": ["sm10"],
   "AMJ": ["dp5"],
   "AOR": ["xy7"],
@@ -55,6 +56,7 @@ export const SET_CODE_TO_IDS = {
   "DEX": ["bw5", "bw6"],
   "DF": ["ex15"],
   "DFU": ["bw4"],
+  "DLR": ["me06"],
   "DOC": ["sm115"],
   "DP": ["dp1"],
   "DPI": ["det1"],
@@ -316,6 +318,7 @@ export const SET_CODE_TO_IDS = {
 // Nom d'extension en français (minuscules) -> identifiants
 export const SET_NAME_TO_IDS = {
   "151": ["sv03.5"],
+  "30ᵉ anniversaire": ["30th"],
   "alliance infaillible": ["sm10"],
   "aquapolis": ["ecard2"],
   "astres radieux": ["swsh10"],
@@ -332,6 +335,7 @@ export const SET_NAME_TO_IDS = {
   "ciel rugissant": ["xy6"],
   "clash des rebelles": ["swsh2"],
   "coffre des dragons": ["dv1"],
+  "collection classique 30ᵉ anniversaire": ["30th-c"],
   "collection mcdonald's 2011": ["2011bw"],
   "collection mcdonald's 2012": ["2012bw"],
   "collection mcdonald's 2013": ["2013bw"],
@@ -465,6 +469,7 @@ export const SET_NAME_TO_IDS = {
   "rivaux émergeants": ["pl2"],
   "rupture turbo": ["xy9"],
   "règne de glace": ["swsh6"],
+  "règne delta": ["me06"],
   "réjouissances rayonnantes": ["A2b"],
   "sagesse entre ciel et mer": ["A4"],
   "set de base": ["base1"],
@@ -521,6 +526,9 @@ export const SET_NAME_TO_IDS = {
 // Le catalogue TCGplayer, seule source pour les scellés, n'existe
 // qu'en anglais : cette table permet de rétablir le français.
 export const SET_EN_TO_FR = {
+  "30th celebration": "30ᵉ Anniversaire",
+  "30th celebration classic collection": "Collection Classique 30ᵉ Anniversaire",
+  "30th classic collection": "Collection Classique 30ᵉ Anniversaire",
   "ancient origins": "Origines Antiques",
   "ascended heroes": "Héros Transcendants",
   "astral radiance": "Astres Radieux",
@@ -554,6 +562,7 @@ export const SET_EN_TO_FR = {
   "crystal guardians": "EX Gardiens de Cristal",
   "dark explorers": "Explorateurs Obscurs",
   "darkness ablaze": "Ténèbres Embrasées",
+  "delta reign": "Règne Delta",
   "delta species": "EX Espèces Delta",
   "deoxys": "EX Deoxys",
   "destined rivals": "Rivalités Destinées",
