@@ -12,14 +12,17 @@ export async function GET(req) {
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
-    const sort = searchParams.get("sort") || "recent";
+    const sort = searchParams.get("sort") || "custom";
 
     let where = { userId: session.user.id };
     if (search) {
       where.name = { contains: search, mode: "insensitive" };
     }
 
-    let orderBy = { createdAt: "desc" };
+    // "custom" respecte l'ordre glissé-déposé à la main (sortOrder), les
+    // cartes jamais déplacées restant départagées par date d'ajout.
+    let orderBy = [{ sortOrder: "asc" }, { createdAt: "desc" }];
+    if (sort === "recent") orderBy = { createdAt: "desc" };
     if (sort === "name-asc") orderBy = { name: "asc" };
     if (sort === "name-desc") orderBy = { name: "desc" };
     if (sort === "price-asc") orderBy = { purchasePrice: "asc" };
@@ -70,6 +73,9 @@ export async function POST(req) {
         imageUrl: data.imageUrl,
         cardmarketUrl: data.cardmarketUrl,
         purchaseDate: new Date(data.purchaseDate),
+        // Valeur très négative : la carte ajoutée apparaît en tête de
+        // l'ordre personnalisé, comme elle le faisait déjà en tri "récent".
+        sortOrder: -Date.now(),
       },
     });
 

@@ -13,7 +13,6 @@ import {
   Loader2,
   ExternalLink,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
 import { getImageSrc } from "@/lib/image";
 import Modal from "@/components/ui/Modal";
 import {
@@ -48,12 +47,13 @@ const emptyForm = {
 };
 
 export default function CardsPage() {
-  const { data: session } = useSession();
   const [cards, setCards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [sort, setSort] = useState("recent");
+  const [sort, setSort] = useState("custom");
+  const [draggedId, setDraggedId] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const [sellingCard, setSellingCard] = useState(null);
@@ -411,6 +411,67 @@ export default function CardsPage() {
     return true;
   });
 
+  // Le glisser-déposer ne porte que sur l'ordre personnalisé, et seulement
+  // quand rien n'est filtré : sinon la position dans la liste affichée ne
+  // correspondrait plus à la position réelle parmi toutes les cartes.
+  const canReorder = sort === "custom" && !debouncedSearch && activeFilterCount === 0;
+
+  /** Repère si la souris survole la moitié gauche ou droite de la carte. */
+  function handleDragOver(e, card) {
+    if (!canReorder || !draggedId || draggedId === card.id) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const rect = e.currentTarget.getBoundingClientRect();
+    const after = e.clientX - rect.left > rect.width / 2;
+    setDropTarget((prev) =>
+      prev && prev.id === card.id && prev.after === after
+        ? prev
+        : { id: card.id, after }
+    );
+  }
+
+  /** Déplace la carte glissée juste avant/après la carte survolée. */
+  function handleDrop() {
+    const dragId = draggedId;
+    const target = dropTarget;
+    setDraggedId(null);
+    setDropTarget(null);
+    if (!canReorder || !dragId || !target || dragId === target.id) return;
+
+    const dragIndex = cards.findIndex((c) => c.id === dragId);
+    if (dragIndex === -1) return;
+
+    const reordered = [...cards];
+    const [moved] = reordered.splice(dragIndex, 1);
+    const targetIndex = reordered.findIndex((c) => c.id === target.id);
+    if (targetIndex === -1) return;
+    const insertIndex = target.after ? targetIndex + 1 : targetIndex;
+    reordered.splice(insertIndex, 0, moved);
+
+    const prev = reordered[insertIndex - 1];
+    const next = reordered[insertIndex + 1];
+    let sortOrder;
+    if (prev && next) sortOrder = (prev.sortOrder + next.sortOrder) / 2;
+    else if (prev) sortOrder = prev.sortOrder + 1;
+    else if (next) sortOrder = next.sortOrder - 1;
+    else sortOrder = 0;
+
+    reordered[insertIndex] = { ...moved, sortOrder };
+
+    const previous = cards;
+    setCards(reordered);
+
+    fetch(`/api/cards/${dragId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sortOrder }),
+    })
+      .then((res) => {
+        if (!res.ok) setCards(previous);
+      })
+      .catch(() => setCards(previous));
+  }
+
   const totalInvested = filteredCards.reduce(
     (sum, card) => sum + card.purchasePrice * card.quantity,
     0
@@ -423,7 +484,7 @@ export default function CardsPage() {
   const potentialGain = totalValue - totalInvested;
 
   return (
-    <DashboardLayout user={session?.user}>
+    <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -924,6 +985,7 @@ export default function CardsPage() {
             onChange={(e) => setSort(e.target.value)}
             className="px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-dark-50"
           >
+            <option value="custom">Ordre personnalisé</option>
             <option value="recent">Récent</option>
             <option value="name-asc">Nom A → Z</option>
             <option value="name-desc">Nom Z → A</option>
@@ -1028,6 +1090,14 @@ export default function CardsPage() {
           </div>
         )}
 
+        {sort === "custom" && cards.length > 1 && (
+          <p className="text-xs text-dark-500 -mt-2">
+            {canReorder
+              ? "Glissez-déposez une carte pour la replacer où vous voulez."
+              : "Videz la recherche et les filtres pour pouvoir réorganiser les cartes."}
+          </p>
+        )}
+
         {/* Stats */}
         {filteredCards.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1108,7 +1178,29 @@ export default function CardsPage() {
               return (
                 <div
                   key={card.id}
-                  className="surface rounded-xl overflow-hidden surface-hover transition group"
+                  draggable={canReorder}
+                  onDragStart={(e) => {
+                    setDraggedId(card.id);
+                    e.dataTransfer.effectAllowed = "move";
+                  }}
+                  onDragOver={(e) => handleDragOver(e, card)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    handleDrop();
+                  }}
+                  onDragEnd={() => {
+                    setDraggedId(null);
+                    setDropTarget(null);
+                  }}
+                  className={`surface rounded-xl overflow-hidden surface-hover transition group ${
+                    canReorder ? "cursor-grab active:cursor-grabbing" : ""
+                  } ${draggedId === card.id ? "opacity-40" : ""} ${
+                    dropTarget?.id === card.id && draggedId && draggedId !== card.id
+                      ? dropTarget.after
+                        ? "border-r-4 border-brand-primary"
+                        : "border-l-4 border-brand-primary"
+                      : ""
+                  }`}
                 >
                   <div
                     onClick={() => setDetailCard(card)}

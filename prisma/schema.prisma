@@ -114,6 +114,10 @@ model Card {
 
   priceUpdatedAt DateTime?
 
+  // Position choisie à la main par glisser-déposer. Une carte ajoutée
+  // reçoit une valeur très négative pour apparaître en tête, comme avant.
+  sortOrder Float @default(0)
+
   imageUrl String?
 
   cardmarketUrl String?
