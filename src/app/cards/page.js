@@ -1278,12 +1278,20 @@ export default function CardsPage() {
                     </div>
 
                     <div
-                      className={`text-[10px] font-semibold ${
+                      className={`flex flex-wrap items-baseline gap-x-1 text-[10px] font-semibold ${
                         gain >= 0 ? "text-green-400" : "text-red-400"
                       }`}
                     >
-                      {gain >= 0 ? "+" : ""}€{gain.toFixed(2)}
-                      {gainPercent !== null && ` (${gainPercent >= 0 ? "+" : ""}${gainPercent.toFixed(0)}%)`}
+                      <span>
+                        {gain >= 0 ? "+" : ""}€{gain.toFixed(2)}
+                        {gainPercent !== null && ` (${gainPercent >= 0 ? "+" : ""}${gainPercent.toFixed(0)}%)`}
+                      </span>
+                      <span
+                        className="ml-auto text-[9px] font-normal text-dark-500 whitespace-nowrap"
+                        title="Acheté le"
+                      >
+                        {new Date(card.purchaseDate).toLocaleDateString("fr-FR", { timeZone: "UTC" })}
+                      </span>
                     </div>
 
                     <div className="flex gap-1 pt-1 border-t border-dark-700">
